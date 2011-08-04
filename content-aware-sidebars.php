@@ -6,7 +6,7 @@
 Plugin Name: Content Aware Sidebars
 Plugin URI: http://www.intox.dk/
 Description: Manage and show sidebars according to the content being viewed.
-Version: 0.1
+Version: 0.2
 Author: Joachim Jensen
 Author URI: http://www.intox.dk/
 License:
@@ -29,7 +29,7 @@ License:
 */
 class ContentAwareSidebars {
 	
-	public $version = 0.1;
+	public $version = 0.2;
 	public $settings = array();
 	
 	/**
@@ -44,6 +44,8 @@ class ContentAwareSidebars {
 		add_action('widgets_init',		array(&$this,'create_sidebars'));
 		add_action('admin_init',		array(&$this,'create_meta_boxes'));
 		add_action('admin_head',		array(&$this,'init_settings'));
+		add_action( 'admin_menu', array(&$this,'clear_admin_menu') );
+
 		add_action('save_post', 		array(&$this,'save_post'));
 		
 		register_activation_hook(__FILE__,	array(&$this,'upon_activation'));
@@ -100,7 +102,7 @@ class ContentAwareSidebars {
 			'merge-pos'	=> array(
 				'name'	=> 'Merge position',
 				'id'	=> 'merge-pos',
-				'desc'	=> 'Place sidebar on top or bottom of host when merging. Merging can happen with all handlings.',
+				'desc'	=> 'Place sidebar on top or bottom of host when merging.',
 				'val'	=> 1,
 				'type'	=> 'select',
 				'list'	=> array('Top','Bottom')
@@ -114,6 +116,7 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function init_sidebar_type() {
+		global $submenu;
 		register_post_type('sidebar',array(
 			'labels'	=> array(
 				'name'			=> _x('Sidebars', 'post type general name'),
@@ -134,8 +137,25 @@ class ContentAwareSidebars {
 			'query_var'	=> false,
 			'rewrite'	=> false,
 			'menu_position' => null,
-			'supports'	=> array('title','page-attributes'),
+			'supports'	=> array('title','excerpt','page-attributes'),
+			'taxonomies'	=> get_taxonomies(array('public'=>true))
 		));
+		
+		
+		
+	}
+
+	/**
+	 *
+	 * Remove taxonomy shortcuts from menu. Gets too cluttered.
+	 *
+	 */
+	function clear_admin_menu() {
+		$taxonomies = get_taxonomies(array('public'=>true));
+		foreach($taxonomies as $tax)
+			remove_submenu_page('edit.php?post_type=sidebar','edit-tags.php?taxonomy='.$tax.'&amp;post_type=sidebar');
+		
+
 	}
 	
 	/**
@@ -144,10 +164,15 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function create_sidebars() {
-		$posts = get_posts(array( 'numberposts' => 0, 'post_type'=> 'sidebar'));
+		$posts = get_posts(array(
+			'numberposts'	=> 0,
+			'post_type'	=> 'sidebar',
+			'post_status'	=> array('publish','future')
+		));
 		foreach($posts as $post)
 			register_sidebar( array(
 				'name'		=> $post->post_title,
+				'description'	=> $post->post_excerpt,
 				'id'		=> 'ca-sidebar-'.$post->ID,
 				'before_widget'	=> '<li id="%1$s" class="widget-container %2$s">',
 				'after_widget'	=> '</li>',
@@ -165,6 +190,14 @@ class ContentAwareSidebars {
 	public function replace_sidebar() {
 		global  $wp_query, $post_type, $_wp_sidebars_widgets;
 		
+		// Archives are not supported yet.
+		if(!is_singular())
+			return;
+		
+		$handled_already = array();
+		$content_type = get_post_type();
+		$post_terms = get_object_taxonomies($content_type);
+		
 		$posts = get_posts(array(
 			'numberposts'	=> 0,
 			'post_type'	=> 'sidebar',
@@ -179,32 +212,48 @@ class ContentAwareSidebars {
 				)
 			)
 		));
-		$handled_already = array();
 		
-		// Variable and function are not always equal.
-		$content_type = $post_type;
-		if(!$content_type)
-			$content_type = get_post_type();
-		
-		// Only grab meta when needed.
 		foreach($posts as $post) {
-
-			$id = 'ca-sidebar-'.$post->ID;
-			$post_types = (array) unserialize(get_post_meta($post->ID, 'post_types', true));
 			
-			// Check if current post type is part of post type rules
-			if(!in_array($content_type,$post_types))
-				continue;
-		
-			$host = get_post_meta($post->ID, 'host', true);
-		
-			// Check if sidebar or host exists
+			$continue = 1;
+			$id = 'ca-sidebar-'.$post->ID;
+			
+			// Check if sidebar exists
 			if (!isset($_wp_sidebars_widgets[$id]))
 				continue;
 			
+			$post_types = (array) unserialize(get_post_meta($post->ID, 'post_types', true));
+			
+			// Check if current post type is part of rules
+			if(in_array($content_type,$post_types)) {
+				$continue--;
+			// Check if post has any taxonomies at all
+			} elseif($post_terms) {
+					
+				$sorted_terms = array();
+				$post_terms = wp_get_object_terms(get_the_ID(),$post_terms);
+				
+				//Grab posts terms and split them in taxonomies
+				foreach($post_terms as $term)
+					$sorted_terms[$term->taxonomy][] = $term->slug;
+				
+				//Check if any of current terms is part of rules
+				foreach($sorted_terms as $taxonomy => $terms) {
+					if(has_term($terms,$taxonomy,$post->ID)) {
+						$continue--;
+						break;
+					}
+				}
+			}
+			
+			// Final check
+			if($continue)
+				continue;
+			
+			$host = get_post_meta($post->ID, 'host', true);
 			$handle = get_post_meta($post->ID, 'handle', true);	
 			
-			// If host has already been replaced, merge with it instead.
+			// If host has already been replaced, merge with it instead. Might change in future.
 			if($handle || isset($handled_already[$host])) {
 				$merge_pos = get_post_meta($post->ID, 'merge-pos', true);
 				if($merge_pos)
@@ -299,9 +348,9 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function save_post($post_id) {
-		global $post;
 		
-		
+		if(get_post_type($post_id) != 'sidebar')
+			return $post_id;
 		
 		// Save button pressed
 		if(!isset($_POST['original_publish'])) {
@@ -364,15 +413,15 @@ global $ca_sidebars;
 $ca_sidebars = new ContentAwareSidebars();
 
 // Template function
-function display_ca_sidebar($args = array()) {
+function display_ca_sidebar($args) {
 	global $wp_query, $post_type, $_wp_sidebars_widgets;
 	
-	if(empty($args)) {
-		$args = array(
-			'before'	=> '<div id="sidebar" class="widget-area"><ul class="xoxo">',
-			'after'		=> '</ul></div>'
-		);
-	}
+	$defaults = array (
+ 		'before'	=> '<div id="sidebar" class="widget-area"><ul class="xoxo">',
+		'after'		=> '</ul></div>'
+	);
+	$args = wp_parse_args($args,$defaults);
+	extract( $args, EXTR_SKIP );
 	
 	$posts = get_posts(array(
 		'numberposts'	=> 0,
@@ -420,9 +469,9 @@ function display_ca_sidebar($args = array()) {
 	}
 	
 	if ($host && is_active_sidebar($host)) {
-		echo $args['before'];
+		echo $before;
 		dynamic_sidebar($host);
-		echo $args['after'];
+		echo $after;
 	}
 	
 }

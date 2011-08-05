@@ -4,7 +4,7 @@ Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE
 Tags: sidebar, widget, content aware, post type, taxonomy, term
 Requires at least: 3.0
 Tested up to: 3.2.1
-Stable tag: 0.2
+Stable tag: 0.3
 
 Manage and show sidebars according to the content being viewed.
 
@@ -18,14 +18,15 @@ Current features include:
 * Show sidebars with posts containing specific taxonomy terms only
 * Merge new sidebars with others, replace them or simply add them to your theme manually
 * Create complex content with nested sidebars
-* Standard Custom Post Type features (status, visibility, publish date)
+* Private sidebars only for members
+* Schedule sidebars for later publishing
 
-Upcoming features:
+Some upcoming features:
 
 * Show sidebars in a time span only
 * Show sidebars with (taxonomy term and post type) archives
 
-If you have any suggestions, please send me a mail at jv@intox.dk.
+If you have any suggestions, please send a mail to jv[at]intox.dk or contact me at www.intox.dk.
 
 == Installation ==
 
@@ -51,6 +52,14 @@ You are.
 
 == Changelog ==
 
+= 0.3 =
+
+* Added: Sidebars can now be private
+* Fixed: taxonomy terms are now supported by template function
+* Fixed: faster rule recognition and handling
+* Fixed: custom taxonomies are now supported properly
+* Fixed: error if several sidebars had taxonomy terms rules
+
 = 0.2 =
 
 * Added: taxonomy terms rules
@@ -71,4 +80,4 @@ You are.
 
 == Translations ==
 
-None yet. Might come in the future. Do you want to contribute? Feel free to contact me at jv@intox.dk
+None yet. Might come in the future. Do you want to contribute? Send a mail to jv[at]intox.dk

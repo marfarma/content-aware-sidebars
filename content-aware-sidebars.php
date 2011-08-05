@@ -6,7 +6,7 @@
 Plugin Name: Content Aware Sidebars
 Plugin URI: http://www.intox.dk/
 Description: Manage and show sidebars according to the content being viewed.
-Version: 0.2
+Version: 0.3
 Author: Joachim Jensen
 Author URI: http://www.intox.dk/
 License:
@@ -29,7 +29,7 @@ License:
 */
 class ContentAwareSidebars {
 	
-	public $version = 0.2;
+	public $version = 0.3;
 	public $settings = array();
 	
 	/**
@@ -40,12 +40,11 @@ class ContentAwareSidebars {
 	public function __construct() {
 		
 		add_filter('wp',			array(&$this,'replace_sidebar'));
-		add_action('init',			array(&$this,'init_sidebar_type'));
+		add_action('init',			array(&$this,'init_sidebar_type'),20);
 		add_action('widgets_init',		array(&$this,'create_sidebars'));
 		add_action('admin_init',		array(&$this,'create_meta_boxes'));
 		add_action('admin_head',		array(&$this,'init_settings'));
-		add_action( 'admin_menu', array(&$this,'clear_admin_menu') );
-
+		add_action('admin_menu',		array(&$this,'clear_admin_menu'));
 		add_action('save_post', 		array(&$this,'save_post'));
 		
 		register_activation_hook(__FILE__,	array(&$this,'upon_activation'));
@@ -154,8 +153,6 @@ class ContentAwareSidebars {
 		$taxonomies = get_taxonomies(array('public'=>true));
 		foreach($taxonomies as $tax)
 			remove_submenu_page('edit.php?post_type=sidebar','edit-tags.php?taxonomy='.$tax.'&amp;post_type=sidebar');
-		
-
 	}
 	
 	/**
@@ -167,7 +164,7 @@ class ContentAwareSidebars {
 		$posts = get_posts(array(
 			'numberposts'	=> 0,
 			'post_type'	=> 'sidebar',
-			'post_status'	=> array('publish','future')
+			'post_status'	=> array('publish','private','future')
 		));
 		foreach($posts as $post)
 			register_sidebar( array(
@@ -180,7 +177,7 @@ class ContentAwareSidebars {
 				'after_title'	=> '</h3>',
 			));
 	}
-	
+
 	/**
 	 *
 	 * Replace a sidebar with content aware sidebars
@@ -188,83 +185,100 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function replace_sidebar() {
-		global  $wp_query, $post_type, $_wp_sidebars_widgets;
+		global $_wp_sidebars_widgets;
 		
-		// Archives are not supported yet.
-		if(!is_singular())
+		$posts = $this->get_sidebars();
+		if(!$posts)
 			return;
 		
-		$handled_already = array();
-		$content_type = get_post_type();
-		$post_terms = get_object_taxonomies($content_type);
-		
-		$posts = get_posts(array(
-			'numberposts'	=> 0,
-			'post_type'	=> 'sidebar',
-			'orderby'	=> 'menu_order meta_value',
-			'meta_key'	=> 'handle',
-			'order'		=> 'ASC',
-			'meta_query'	=> array(
-				array(
-					'key'		=> 'handle',
-					'value'		=> '2',
-					'compare'	=> '!='
-				)
-			)
-		));
-		
 		foreach($posts as $post) {
-			
-			$continue = 1;
+	
 			$id = 'ca-sidebar-'.$post->ID;
 			
 			// Check if sidebar exists
 			if (!isset($_wp_sidebars_widgets[$id]))
 				continue;
 			
-			$post_types = (array) unserialize(get_post_meta($post->ID, 'post_types', true));
-			
-			// Check if current post type is part of rules
-			if(in_array($content_type,$post_types)) {
-				$continue--;
-			// Check if post has any taxonomies at all
-			} elseif($post_terms) {
-					
-				$sorted_terms = array();
-				$post_terms = wp_get_object_terms(get_the_ID(),$post_terms);
-				
-				//Grab posts terms and split them in taxonomies
-				foreach($post_terms as $term)
-					$sorted_terms[$term->taxonomy][] = $term->slug;
-				
-				//Check if any of current terms is part of rules
-				foreach($sorted_terms as $taxonomy => $terms) {
-					if(has_term($terms,$taxonomy,$post->ID)) {
-						$continue--;
-						break;
-					}
-				}
-			}
-			
-			// Final check
-			if($continue)
-				continue;
-			
-			$host = get_post_meta($post->ID, 'host', true);
-			$handle = get_post_meta($post->ID, 'handle', true);	
-			
 			// If host has already been replaced, merge with it instead. Might change in future.
-			if($handle || isset($handled_already[$host])) {
-				$merge_pos = get_post_meta($post->ID, 'merge-pos', true);
-				if($merge_pos)
-					$_wp_sidebars_widgets[$host] = array_merge($_wp_sidebars_widgets[$host],$_wp_sidebars_widgets[$id]);
+			if($post->handle || isset($handled_already[$post->host])) {
+				if($post->merge_pos)
+					$_wp_sidebars_widgets[$post->host] = array_merge($_wp_sidebars_widgets[$post->host],$_wp_sidebars_widgets[$id]);
 				else
-					$_wp_sidebars_widgets[$host] = array_merge($_wp_sidebars_widgets[$id],$_wp_sidebars_widgets[$host]);
+					$_wp_sidebars_widgets[$post->host] = array_merge($_wp_sidebars_widgets[$id],$_wp_sidebars_widgets[$post->host]);
 			} else {
-				$_wp_sidebars_widgets[$host] = $_wp_sidebars_widgets[$id];
-				$handled_already[$host] = 1;
+				$_wp_sidebars_widgets[$post->host] = $_wp_sidebars_widgets[$id];
+				$handled_already[$post->host] = 1;
 			}		
-		}		
+		}
+	}
+	
+	public function get_sidebars($handle = "!= '2'") {
+		global $wpdb;
+		
+		$errors = 1;
+		
+		$joins = "";
+		$where = "";
+		
+		if(is_singular()) {
+			
+			$joins .= "LEFT JOIN $wpdb->postmeta post_types ON post_types.post_id = posts.ID AND post_types.meta_key = 'post_types' ";
+			$where .= "(post_types.meta_value LIKE '%".serialize(get_post_type())."%'";		
+			
+			if(has_term() || has_category() || has_tag()) {
+					
+				$post_terms = wp_get_object_terms(get_the_ID(),get_object_taxonomies(get_post_type()));
+				$terms = array();
+				
+				//Grab posts terms by slugs.
+				foreach($post_terms as $term) 
+					$terms[] = $term->slug;
+				
+				$joins .= "LEFT JOIN $wpdb->term_relationships term ON term.object_id = posts.ID ";
+				$joins .= "LEFT JOIN $wpdb->term_taxonomy taxonomy ON taxonomy.term_taxonomy_id = term.term_taxonomy_id ";
+				$joins .= "LEFT JOIN $wpdb->terms terms ON terms.term_id = taxonomy.term_id ";		
+				$where .= " OR terms.slug IN('".implode("','",$terms)."')";
+					
+			}
+			$where .= ") AND ";
+			$errors--;
+		}
+		
+		if($errors)
+			return false;
+		
+		// Show private sidebars or not
+		if(current_user_can('read_private_posts'))
+			$post_status = "IN('publish','private')";
+		else
+			$post_status = "= 'publish'";		
+		$where .= "posts.post_status ".$post_status." AND ";
+		
+		// Get proper sidebars
+		return $wpdb->get_results("
+			SELECT
+				posts.ID,
+				handle.meta_value handle,
+				host.meta_value host,
+				merge_pos.meta_value merge_pos
+			FROM $wpdb->posts posts
+			LEFT JOIN $wpdb->postmeta handle
+				ON handle.post_id = posts.ID
+				AND handle.meta_key = 'handle'
+			LEFT JOIN $wpdb->postmeta host
+				ON host.post_id = posts.ID
+				AND host.meta_key = 'host'
+			LEFT JOIN $wpdb->postmeta merge_pos
+				ON merge_pos.post_id = posts.ID
+				AND merge_pos.meta_key = 'merge-pos'
+			$joins
+			WHERE
+				posts.post_type = 'sidebar' AND
+				$where
+				handle.meta_value $handle
+			GROUP BY posts.ID
+			ORDER BY posts.menu_order ASC, handle.meta_value DESC, posts.post_date DESC
+		");
 	}
 	
 	/**
@@ -272,9 +286,7 @@ class ContentAwareSidebars {
 	 * Meta boxes for edit post
 	 *
 	 */
-	public function create_meta_boxes() {
-		global $post;
-		
+	public function create_meta_boxes() {	
 		add_meta_box(
 			'ca-sidebar',
 			'Options',
@@ -282,14 +294,16 @@ class ContentAwareSidebars {
 			'sidebar',
 			'normal',
 			'high'
-		);
-		
+		);	
 	}
 	
+	/**
+	 *
+	 * Options content
+	 *
+	 */
 	public function meta_box_content() {
-		
 		$this->form_fields(array('post_types','handle','merge-pos','host'));
-		
 	}
 	
 	/**
@@ -325,7 +339,7 @@ class ContentAwareSidebars {
 				case 'select-multi' :
 					echo '<select multiple="multiple" size="5" style="width:200px;height:60px;" name="'.$setting['id'].'[]">'."\n";
 					foreach($setting['list'] as $key => $value) {
-						echo '<option value="'.$key.'"'.(in_array($key,unserialize($current)) ? ' selected="selected"' : '').'>'.$value.'</option>'."\n";
+						echo '<option value="'.$key.'"'.(in_array($key,$current) ? ' selected="selected"' : '').'>'.$value.'</option>'."\n";
 					}
 					echo '</select>'."\n";
 					break;
@@ -349,28 +363,25 @@ class ContentAwareSidebars {
 	 */
 	public function save_post($post_id) {
 		
+		// Only sidebar type
 		if(get_post_type($post_id) != 'sidebar')
 			return $post_id;
 		
 		// Save button pressed
-		if(!isset($_POST['original_publish'])) {
+		if(!isset($_POST['original_publish']))
 			return $post_id;
-		}
 		
 		// Verify nonce
-		if (!check_admin_referer(basename(__FILE__),'_ca-sidebar-nonce')) {
+		if (!check_admin_referer(basename(__FILE__),'_ca-sidebar-nonce'))
 			return $post_id;
-		}
 		
 		// Check permissions
-		if (!current_user_can('edit_post', $post_id)) {
+		if (!current_user_can('edit_post', $post_id))
 			return $post_id;
-		}
 		
 		// Check autosave
-		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)
 			return $post_id;
-		}
 		
 		// Load settings manually here. This ought to be done with action/filter
 		$this->init_settings();
@@ -380,13 +391,13 @@ class ContentAwareSidebars {
 			$old = get_post_meta($post_id, $field['id'], true);			
 			$new = $_POST[$field['id']];
 			
-			switch($field['id']) {	
-				case 'post_types' :
-					$new = serialize($new);
-					break;
-				default :
-					break;
-			}
+			//switch($field['id']) {	
+			//	case 'post_types' :
+			//		$new = serialize($new);
+			//		break;
+			//	default :
+			//		break;
+			//}
 			
 			if ($new != '' && $new != $old) {
 				update_post_meta($post_id, $field['id'], $new);		
@@ -413,66 +424,44 @@ global $ca_sidebars;
 $ca_sidebars = new ContentAwareSidebars();
 
 // Template function
-function display_ca_sidebar($args) {
-	global $wp_query, $post_type, $_wp_sidebars_widgets;
-	
+function display_ca_sidebar($args = array()) {
+	global $ca_sidebars, $_wp_sidebars_widgets;
+		
 	$defaults = array (
  		'before'	=> '<div id="sidebar" class="widget-area"><ul class="xoxo">',
 		'after'		=> '</ul></div>'
 	);
 	$args = wp_parse_args($args,$defaults);
-	extract( $args, EXTR_SKIP );
+	extract($args,EXTR_SKIP);
+		
+	$posts = $ca_sidebars->get_sidebars("='2'");
+	if(!$posts)
+		return;
 	
-	$posts = get_posts(array(
-		'numberposts'	=> 0,
-		'post_type'	=> 'sidebar',
-		'orderby'	=> 'menu_order meta_value',
-		'meta_key'	=> 'handle',
-		'order'		=> 'ASC',
-		'meta_query'	=> array(
-			array(
-				'key'		=> 'handle',
-				'value'		=> '2',
-				'compare'	=> '=='
-			)
-		)
-	));
-	$content_type = $post_type;
-	if(!$content_type)
-		$content_type = get_post_type();
-		
-	$i = $host = 0;
+	$i = $host = 0;	
 	foreach($posts as $post) {
-			
+		
 		$id = 'ca-sidebar-'.$post->ID;
-		$post_types = (array) unserialize(get_post_meta($post->ID, 'post_types', true));
+			
+		// Check if sidebar exists
+		if (!isset($_wp_sidebars_widgets[$id]))
+			continue;
 		
-		// Check if current post type is part of rules
-		if(!in_array($content_type,$post_types))
-			continue;	
-		
+		// Merge if more than one. First one is host.
 		if($i > 0) {
-							
-			// Check if sidebar is active
-			if (!isset($_wp_sidebars_widgets[$id]))
-				continue;
-				
-			$merge_pos = get_post_meta($post->ID, 'merge-pos', true);
-			if($merge_pos)
+			if($post->merge_pos)
 				$_wp_sidebars_widgets[$host] = array_merge($_wp_sidebars_widgets[$host],$_wp_sidebars_widgets[$id]);
 			else
-				$_wp_sidebars_widgets[$host] = array_merge($_wp_sidebars_widgets[$id],$_wp_sidebars_widgets[$host]);		
+				$_wp_sidebars_widgets[$host] = array_merge($_wp_sidebars_widgets[$id],$_wp_sidebars_widgets[$host]);
 		} else {
 			$host = $id;
 		}
 		$i++;
 	}
 	
-	if ($host && is_active_sidebar($host)) {
+	if ($host) {
 		echo $before;
 		dynamic_sidebar($host);
 		echo $after;
 	}
-	
 }
-

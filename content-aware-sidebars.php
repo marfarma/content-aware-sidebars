@@ -6,7 +6,7 @@
 Plugin Name: Content Aware Sidebars
 Plugin URI: http://www.intox.dk/
 Description: Manage and show sidebars according to the content being viewed.
-Version: 0.3
+Version: 0.4
 Author: Joachim Jensen
 Author URI: http://www.intox.dk/
 License:
@@ -29,8 +29,10 @@ License:
 */
 class ContentAwareSidebars {
 	
-	public $version = 0.3;
-	public $settings = array();
+	protected $version = 0.4;
+	protected $settings = array();
+	protected $post_types = array();
+	protected $taxonomies = array();	
 	
 	/**
 	 *
@@ -38,12 +40,14 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function __construct() {
+
+		$this->init_settings();
 		
 		add_filter('wp',			array(&$this,'replace_sidebar'));
 		add_action('init',			array(&$this,'init_sidebar_type'),20);
 		add_action('widgets_init',		array(&$this,'create_sidebars'));
 		add_action('admin_init',		array(&$this,'create_meta_boxes'));
-		add_action('admin_head',		array(&$this,'init_settings'));
+		add_action('admin_head',		array(&$this,'init_metadata'));
 		add_action('admin_menu',		array(&$this,'clear_admin_menu'));
 		add_action('save_post', 		array(&$this,'save_post'));
 		
@@ -53,11 +57,27 @@ class ContentAwareSidebars {
 	
 	/**
 	 *
+	 * Initiate lists
+	 *
+	 */
+	private function init_settings() {
+		
+		
+		// Public post types
+		foreach(get_post_types(array('public'=>true),'objects') as $post_type)
+			$this->post_types[$post_type->name] = $post_type->label;
+		
+		foreach(get_taxonomies(array('public'=>true),'objects') as $tax)
+			$this->taxonomies[$tax->name] = $tax->label;
+	}
+	
+	/**
+	 *
 	 * Create post meta fields
 	 * Loaded in admin_head due to $post. Should be loaded even later if possible.
 	 *
 	 */
-	public function init_settings() {
+	public function init_metadata() {
 		global $post, $wp_registered_sidebars;
 
 		// List of sidebars
@@ -67,20 +87,31 @@ class ContentAwareSidebars {
 				$sidebar_list[$sidebar['id']] = $sidebar['name'];
 		}
 		
-		// List of public post types
-		$post_type_list = array();
-		foreach(get_post_types(array('public'=>true),'objects') as $post_type)
-			$post_type_list[$post_type->name] = $post_type->label; 
-		
 		// Meta fields
 		$this->settings = array(
 			'post_types'	=> array(
 				'name'	=> 'Post Types',
 				'id'	=> 'post_types',
 				'desc'	=> '',
-				'val'	=> '',
-				'type'	=> 'select-multi',
-				'list'	=> $post_type_list
+				'val'	=> array(),
+				'type'	=> 'checkbox',
+				'list'	=> $this->post_types
+			),
+			'taxonomies'	=> array(
+				'name'	=> 'Taxonomies',
+				'id'	=> 'taxonomies',
+				'desc'	=> '',
+				'val'	=> array(),
+				'type'	=> 'checkbox',
+				'list'	=> $this->taxonomies
+			),
+			'exposure'	=> array(
+				'name'	=> 'Exposure',
+				'id'	=> 'exposure',
+				'desc'	=> 'Affects post types, taxonomies and taxonomy terms.',
+				'val'	=> 1,
+				'type'	=> 'select',
+				'list'	=> array('Singular','Singular & Archive','Archive')
 			),
 			'handle'	=> array(
 				'name'	=> 'Handle',
@@ -137,11 +168,8 @@ class ContentAwareSidebars {
 			'rewrite'	=> false,
 			'menu_position' => null,
 			'supports'	=> array('title','excerpt','page-attributes'),
-			'taxonomies'	=> get_taxonomies(array('public'=>true))
-		));
-		
-		
-		
+			'taxonomies'	=> array_flip($this->taxonomies)
+		));		
 	}
 
 	/**
@@ -150,9 +178,8 @@ class ContentAwareSidebars {
 	 *
 	 */
 	function clear_admin_menu() {
-		$taxonomies = get_taxonomies(array('public'=>true));
-		foreach($taxonomies as $tax)
-			remove_submenu_page('edit.php?post_type=sidebar','edit-tags.php?taxonomy='.$tax.'&amp;post_type=sidebar');
+		foreach($this->taxonomies as $key => $value)
+			remove_submenu_page('edit.php?post_type=sidebar','edit-tags.php?taxonomy='.$key.'&amp;post_type=sidebar');
 	}
 	
 	/**
@@ -212,38 +239,93 @@ class ContentAwareSidebars {
 		}
 	}
 	
+	/**
+	 *
+	 * Query sidebars according to content
+	 * @return array|bool
+	 *
+	 */
 	public function get_sidebars($handle = "!= '2'") {
-		global $wpdb;
+		global $wpdb, $post_type;
 		
 		$errors = 1;
 		
 		$joins = "";
 		$where = "";
 		
+		// Single content
 		if(is_singular()) {
 			
 			$joins .= "LEFT JOIN $wpdb->postmeta post_types ON post_types.post_id = posts.ID AND post_types.meta_key = 'post_types' ";
 			$where .= "(post_types.meta_value LIKE '%".serialize(get_post_type())."%'";		
 			
-			if(has_term() || has_category() || has_tag()) {
+			$post_taxonomies = get_object_taxonomies(get_post_type());
+			
+			// Check if content has any taxonomies supported
+			if($post_taxonomies) {
+				$post_terms = wp_get_object_terms(get_the_ID(),$post_taxonomies);
+				// Check if content has any actual taxonomy terms
+				if($post_terms) {
+					$terms = array();
+					$taxonomies = array();
 					
-				$post_terms = wp_get_object_terms(get_the_ID(),get_object_taxonomies(get_post_type()));
-				$terms = array();
-				
-				//Grab posts terms by slugs.
-				foreach($post_terms as $term) 
-					$terms[] = $term->slug;
-				
-				$joins .= "LEFT JOIN $wpdb->term_relationships term ON term.object_id = posts.ID ";
-				$joins .= "LEFT JOIN $wpdb->term_taxonomy taxonomy ON taxonomy.term_taxonomy_id = term.term_taxonomy_id ";
-				$joins .= "LEFT JOIN $wpdb->terms terms ON terms.term_id = taxonomy.term_id ";		
-				$where .= " OR terms.slug IN('".implode("','",$terms)."')";
+					//Grab posts terms and make where rules for taxonomies.
+					foreach($post_terms as $term) {
+						$terms[] = $term->slug;
+						if(!isset($taxonomies[$term->taxonomy])) {
+							$where .= " OR post_tax.meta_value LIKE '%".$taxonomies[$term->taxonomy] = $term->taxonomy."%'";
+						}
+					}
 					
+					$joins .= "LEFT JOIN $wpdb->term_relationships term ON term.object_id = posts.ID ";
+					$joins .= "LEFT JOIN $wpdb->term_taxonomy taxonomy ON taxonomy.term_taxonomy_id = term.term_taxonomy_id ";
+					$joins .= "LEFT JOIN $wpdb->terms terms ON terms.term_id = taxonomy.term_id ";
+					$joins .= "LEFT JOIN $wpdb->postmeta post_tax ON post_tax.post_id = posts.ID AND post_tax.meta_key = 'taxonomies'";
+					
+					$where .= " OR terms.slug IN('".implode("','",$terms)."')";
+				}
 			}
+					
 			$where .= ") AND ";
+			$where .= "exposure.meta_value <= '1' AND ";
+			
+			$errors--;
+			
+		// Taxonomy archives
+		} elseif(is_tax() || is_category() || is_tag()) {
+			
+			$term = get_queried_object();
+			
+			$joins .= "LEFT JOIN $wpdb->term_relationships term ON term.object_id = posts.ID ";
+			$joins .= "LEFT JOIN $wpdb->term_taxonomy taxonomy ON taxonomy.term_taxonomy_id = term.term_taxonomy_id ";
+			$joins .= "LEFT JOIN $wpdb->terms terms ON terms.term_id = taxonomy.term_id ";	
+			$joins .= "LEFT JOIN $wpdb->postmeta post_tax ON post_tax.post_id = posts.ID AND post_tax.meta_key = 'taxonomies'";
+				
+			$where .= "(terms.slug = '$term->slug'";
+			$where .= " OR post_tax.meta_value LIKE '%$term->taxonomy%'";
+			$where .= ") AND ";
+			$where .= "exposure.meta_value >= '1' AND ";
+			
+			$errors--;
+		
+		// TODO: Front page
+		} elseif(is_front_page() && !is_home()) {
+			// Front page laters...
+		// Post Type archives
+		} elseif(is_post_type_archive() || is_home()) {
+			
+			// Home has post as default post type
+			if(!$post_type) $post_type = 'post';
+			
+			$joins .= "LEFT JOIN $wpdb->postmeta post_types ON post_types.post_id = posts.ID AND post_types.meta_key = 'post_types' ";
+			
+			$where .= "(post_types.meta_value LIKE '%$post_type%') AND ";
+			$where .= "exposure.meta_value >= '1' AND ";
+			
 			$errors--;
 		}
 		
+		// Check if any errors are left
 		if($errors)
 			return false;
 		
@@ -254,7 +336,7 @@ class ContentAwareSidebars {
 			$post_status = "= 'publish'";		
 		$where .= "posts.post_status ".$post_status." AND ";
 		
-		// Get proper sidebars
+		// Return proper sidebars
 		return $wpdb->get_results("
 			SELECT
 				posts.ID,
@@ -271,6 +353,9 @@ class ContentAwareSidebars {
 			LEFT JOIN $wpdb->postmeta merge_pos
 				ON merge_pos.post_id = posts.ID
 				AND merge_pos.meta_key = 'merge-pos'
+			LEFT JOIN $wpdb->postmeta exposure
+				ON exposure.post_id = posts.ID
+				AND exposure.meta_key = 'exposure'
 			$joins
 			WHERE
 				posts.post_type = 'sidebar' AND
@@ -294,7 +379,16 @@ class ContentAwareSidebars {
 			'sidebar',
 			'normal',
 			'high'
-		);	
+		);
+		add_meta_box(
+			'ca-sidebar-author-words',
+			'Words from the author',
+			array(&$this,'meta_box_author_words'),
+			'sidebar',
+			'side',
+			'high'
+		);
+		
 	}
 	
 	/**
@@ -303,7 +397,26 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function meta_box_content() {
-		$this->form_fields(array('post_types','handle','merge-pos','host'));
+		$this->form_fields();
+	}
+	
+	/**
+	 *
+	 * Author words content
+	 *
+	 */
+	public function meta_box_author_words() {
+		// Use nonce for verification
+		wp_nonce_field(basename(__FILE__),'_ca-sidebar-nonce');
+		?>
+		<div style="text-align:center;">
+		<div><p>If you love this plugin, please consider donating.</p></div>
+		<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE6A72LEN4&lc=US&item_name=WordPress%20Plugin%3a%20Content%20Aware%20Sidebars&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted"
+		   target="_blank" title="PayPal - The safer, easier way to pay online!">
+			<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" width="147" height="47" alt="PayPal - The safer, easier way to pay online!">	
+		</a>
+		</div>
+		<?php
 	}
 	
 	/**
@@ -311,22 +424,24 @@ class ContentAwareSidebars {
 	 * Create form fields
 	 *
 	 */
-	private function form_fields($array) {
+	private function form_fields($array = array(), $show_name = 1) {
 		global $post;
-		
-		// Use nonce for verification
-		wp_nonce_field(basename(__FILE__),'_ca-sidebar-nonce');
+
 		?>
 		<table class="form-table"> 
 		<?php
-		$array = array_intersect_key($this->settings,array_flip($array));
+		if(!empty($array))
+			$array = array_intersect_key($this->settings,array_flip($array));
+		else
+			$array = $this->settings;
 		foreach($array as $setting) :
 		
-		$meta = get_post_meta($post->ID, $setting['id'], true);
-		$current = $meta != '' ? $meta : $setting['val'];
-		?>
+			$meta = get_post_meta($post->ID, $setting['id'], true);
+			$current = $meta != '' ? $meta : $setting['val'];
+			?>
+			
 			<tr valign="top">
-				<th scope="row"><?php echo $setting['name'] ?></th>
+			<?php if($show_name) echo '<th scope="row">'.$setting['name'].'</th>'; ?>
 				<td>
 			<?php switch($setting['type']) :
 				case 'select' :			
@@ -342,6 +457,13 @@ class ContentAwareSidebars {
 						echo '<option value="'.$key.'"'.(in_array($key,$current) ? ' selected="selected"' : '').'>'.$value.'</option>'."\n";
 					}
 					echo '</select>'."\n";
+					break;
+				case 'checkbox' :
+					echo '<ul>'."\n";
+					foreach($setting['list'] as $key => $value) {
+						echo '<li><label><input type="checkbox" name="'.$setting['id'].'[]" value="'.$key.'"'.(in_array($key,$current) ? ' checked="checked"' : '').' /> '.$value.'</label></li>'."\n";
+					}
+					echo '</ul>'."\n";
 					break;
 				case 'text' :
 				default :
@@ -384,21 +506,13 @@ class ContentAwareSidebars {
 			return $post_id;
 		
 		// Load settings manually here. This ought to be done with action/filter
-		$this->init_settings();
+		$this->init_metadata();
 		
 		// Update values
 		foreach ($this->settings as $field) {
 			$old = get_post_meta($post_id, $field['id'], true);			
-			$new = $_POST[$field['id']];
-			
-			//switch($field['id']) {	
-			//	case 'post_types' :
-			//		$new = serialize($new);
-			//		break;
-			//	default :
-			//		break;
-			//}
-			
+			$new = isset($_POST[$field['id']]) ? $_POST[$field['id']] : '';
+
 			if ($new != '' && $new != $old) {
 				update_post_meta($post_id, $field['id'], $new);		
 			}elseif ($new == '' && $old != '') {
@@ -426,7 +540,8 @@ $ca_sidebars = new ContentAwareSidebars();
 // Template function
 function display_ca_sidebar($args = array()) {
 	global $ca_sidebars, $_wp_sidebars_widgets;
-		
+	
+	// Grab args or defaults	
 	$defaults = array (
  		'before'	=> '<div id="sidebar" class="widget-area"><ul class="xoxo">',
 		'after'		=> '</ul></div>'

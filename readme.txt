@@ -2,9 +2,9 @@
 Contributors: intoxstudio
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE6A72LEN4&lc=US&item_name=WordPress%20Plugin%3a%20Content%20Aware%20Sidebars&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted
 Tags: sidebar, widget, content aware, post type, taxonomy, term, archive
-Requires at least: 3.0
+Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 0.4
+Stable tag: 0.5
 
 Manage and show sidebars according to the content being viewed.
 
@@ -13,19 +13,20 @@ Manage and show sidebars according to the content being viewed.
 Manage an infinite number of sidebars. Each with different rules for which content they should be visible with. Creating flexible sidebars has never been easier, and no code is needed at all as everything is done in the administration.
 No extra database tables or table columns will be added.
 
-<b>Features</b>
+= Features =
 
 * Show sidebars with specific post types
 * Show sidebars with posts containing specific taxonomies or taxonomy terms
 * Show sidebars with specific post type archives, taxonomy archives or taxonomy term archives
+* Show sidebars with search, 404 page and front page
 * Merge new sidebars with others, replace them or simply add them to your theme manually
 * Create complex content with nested sidebars
 * Private sidebars only for members
 * Schedule sidebars for later publishing
 
-<b>Contact</b>
+= Contact =
 
-If you have any suggestions, please send a mail to jv[at]intox.dk or contact me at www.intox.dk.
+www.intox.dk
 
 == Installation ==
 
@@ -50,6 +51,11 @@ You are.
 4. Viewing a page. `For Pages` has replaced `Main Sidebar`
 
 == Changelog ==
+
+= 0.5 =
+
+* Added: search, 404, front page rules now supported
+* Fixed: custom tax and terms are now supported properly (again)
 
 = 0.4 =
 
@@ -79,6 +85,10 @@ You are.
 * First stable release
 
 == Upgrade Notice ==
+
+= 0.5 =
+
+* Note that the plugin now requires at least WordPress 3.1 because of post type archives.
 
 = 0.4 =
 

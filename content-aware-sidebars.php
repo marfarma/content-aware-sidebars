@@ -6,10 +6,10 @@
 Plugin Name: Content Aware Sidebars
 Plugin URI: http://www.intox.dk/
 Description: Manage and show sidebars according to the content being viewed.
-Version: 0.4
+Version: 0.5
 Author: Joachim Jensen
 Author URI: http://www.intox.dk/
-License:
+License: GPL2
 
     Copyright 2011  Joachim Jensen  (email : jv@intox.dk)
 
@@ -29,7 +29,7 @@ License:
 */
 class ContentAwareSidebars {
 	
-	protected $version = 0.4;
+	protected $version = 0.5;
 	protected $settings = array();
 	protected $post_types = array();
 	protected $taxonomies = array();	
@@ -40,8 +40,6 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function __construct() {
-
-		$this->init_settings();
 		
 		add_filter('wp',			array(&$this,'replace_sidebar'));
 		add_action('init',			array(&$this,'init_sidebar_type'),20);
@@ -61,12 +59,12 @@ class ContentAwareSidebars {
 	 *
 	 */
 	private function init_settings() {
-		
-		
+			
 		// Public post types
 		foreach(get_post_types(array('public'=>true),'objects') as $post_type)
 			$this->post_types[$post_type->name] = $post_type->label;
 		
+		// Public taxonomies
 		foreach(get_taxonomies(array('public'=>true),'objects') as $tax)
 			$this->taxonomies[$tax->name] = $tax->label;
 	}
@@ -105,13 +103,29 @@ class ContentAwareSidebars {
 				'type'	=> 'checkbox',
 				'list'	=> $this->taxonomies
 			),
+			'static'	=> array(
+				'name'	=> 'Static Pages',
+				'id'	=> 'static',
+				'desc'	=> '',
+				'val'	=> array(),
+				'type'	=> 'checkbox',
+				'list'	=> array(
+					'front-page'	=> 'Front Page',
+					'search'	=> 'Search',
+					'404'		=> '404'
+				)
+			),
 			'exposure'	=> array(
 				'name'	=> 'Exposure',
 				'id'	=> 'exposure',
 				'desc'	=> 'Affects post types, taxonomies and taxonomy terms.',
 				'val'	=> 1,
 				'type'	=> 'select',
-				'list'	=> array('Singular','Singular & Archive','Archive')
+				'list'	=> array(
+					 'Singular',
+					 'Singular & Archive',
+					 'Archive'
+				 )
 			),
 			'handle'	=> array(
 				'name'	=> 'Handle',
@@ -119,7 +133,11 @@ class ContentAwareSidebars {
 				'desc'	=> 'Replace host sidebar, merge with it or add sidebar manually.',
 				'val'	=> 0,
 				'type'	=> 'select',
-				'list'	=> array('Replace','Merge','Manual')
+				'list'	=> array(
+					'Replace',
+					'Merge',
+					'Manual'
+				)
 			),
 			'host'		=> array(
 				'name'	=> 'Host Sidebar',
@@ -135,7 +153,10 @@ class ContentAwareSidebars {
 				'desc'	=> 'Place sidebar on top or bottom of host when merging.',
 				'val'	=> 1,
 				'type'	=> 'select',
-				'list'	=> array('Top','Bottom')
+				'list'	=> array(
+					'Top',
+					'Bottom'
+				)
 			)
 		);
 	}
@@ -146,7 +167,9 @@ class ContentAwareSidebars {
 	 *
 	 */
 	public function init_sidebar_type() {
-		global $submenu;
+		
+		$this->init_settings();
+		
 		register_post_type('sidebar',array(
 			'labels'	=> array(
 				'name'			=> _x('Sidebars', 'post type general name'),
@@ -253,8 +276,18 @@ class ContentAwareSidebars {
 		$joins = "";
 		$where = "";
 		
+		// Front page
+		if(is_front_page()) {
+			
+			$joins .= "LEFT JOIN $wpdb->postmeta static ON static.post_id = posts.ID AND static.meta_key = 'static' ";
+			
+			$where .= "(static.meta_value LIKE '%".serialize('front-page')."%') AND ";
+			$where .= "exposure.meta_value <= '1' AND ";
+			
+			$errors--;	
+		
 		// Single content
-		if(is_singular()) {
+		} elseif(is_singular()) {
 			
 			$joins .= "LEFT JOIN $wpdb->postmeta post_types ON post_types.post_id = posts.ID AND post_types.meta_key = 'post_types' ";
 			$where .= "(post_types.meta_value LIKE '%".serialize(get_post_type())."%'";		
@@ -307,10 +340,7 @@ class ContentAwareSidebars {
 			$where .= "exposure.meta_value >= '1' AND ";
 			
 			$errors--;
-		
-		// TODO: Front page
-		} elseif(is_front_page() && !is_home()) {
-			// Front page laters...
+			
 		// Post Type archives
 		} elseif(is_post_type_archive() || is_home()) {
 			
@@ -321,6 +351,26 @@ class ContentAwareSidebars {
 			
 			$where .= "(post_types.meta_value LIKE '%$post_type%') AND ";
 			$where .= "exposure.meta_value >= '1' AND ";
+			
+			$errors--;
+		
+		// Search
+		} elseif(is_search()) {
+			
+			$joins .= "LEFT JOIN $wpdb->postmeta static ON static.post_id = posts.ID AND static.meta_key = 'static' ";
+			
+			$where .= "(static.meta_value LIKE '%".serialize('search')."%') AND ";
+			$where .= "exposure.meta_value <= '1' AND ";
+			
+			$errors--;
+			
+		// 404
+		} elseif(is_404()) {
+			
+			$joins .= "LEFT JOIN $wpdb->postmeta static ON static.post_id = posts.ID AND static.meta_key = 'static' ";
+			
+			$where .= "(static.meta_value LIKE '%".serialize('404')."%') AND ";
+			$where .= "exposure.meta_value <= '1' AND ";
 			
 			$errors--;
 		}

@@ -45,6 +45,8 @@ You are.
 
 == Screenshots ==
 
+Note that these screenshots are from version 0.1. They will soon be updated to match current look.
+
 1. Add a new sidebar `For Pages` visible on all pages, replacing `Main Sidebar`
 2. Add widgets to `For Pages`
 3. Viewing home page. `Main Sidebar` is visible

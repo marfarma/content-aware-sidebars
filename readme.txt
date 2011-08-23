@@ -1,4 +1,4 @@
-=== Plugin Name ===
+﻿=== Plugin Name ===
 Contributors: intoxstudio
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE6A72LEN4&lc=US&item_name=WordPress%20Plugin%3a%20Content%20Aware%20Sidebars&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted
 Tags: sidebar, widget, content aware, post type, taxonomy, term, archive
@@ -44,8 +44,6 @@ Easy install:
 You are.
 
 == Screenshots ==
-
-Note that these screenshots are from version 0.1. They will soon be updated to match current look.
 
 1. Add a new sidebar `For Pages` visible on all pages, replacing `Main Sidebar`
 2. Add widgets to `For Pages`

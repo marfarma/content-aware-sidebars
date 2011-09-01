@@ -88,7 +88,7 @@ class ContentAwareSidebars {
 		// Meta fields
 		$this->settings = array(
 			'post_types'	=> array(
-				'name'	=> 'Post Types',
+				'name'	=> __('Post Types', 'content-aware-sidebars'),
 				'id'	=> 'post_types',
 				'desc'	=> '',
 				'val'	=> array(),
@@ -96,7 +96,7 @@ class ContentAwareSidebars {
 				'list'	=> $this->post_types
 			),
 			'taxonomies'	=> array(
-				'name'	=> 'Taxonomies',
+				'name'	=> __('Taxonomies', 'content-aware-sidebars'),
 				'id'	=> 'taxonomies',
 				'desc'	=> '',
 				'val'	=> array(),
@@ -104,58 +104,58 @@ class ContentAwareSidebars {
 				'list'	=> $this->taxonomies
 			),
 			'static'	=> array(
-				'name'	=> 'Static Pages',
+				'name'	=> __('Static Pages', 'content-aware-sidebars'),
 				'id'	=> 'static',
 				'desc'	=> '',
 				'val'	=> array(),
 				'type'	=> 'checkbox',
 				'list'	=> array(
-					'front-page'	=> 'Front Page',
-					'search'	=> 'Search',
-					'404'		=> '404'
+					'front-page'	=> __('Front Page', 'content-aware-sidebars'),
+					'search'	=> __('Search', 'content-aware-sidebars'),
+					'404'		=> __('404', 'content-aware-sidebars')
 				)
 			),
 			'exposure'	=> array(
-				'name'	=> 'Exposure',
+				'name'	=> __('Exposure', 'content-aware-sidebars'),
 				'id'	=> 'exposure',
-				'desc'	=> 'Affects post types, taxonomies and taxonomy terms.',
+				'desc'	=> __('Affects post types, taxonomies and taxonomy terms.', 'content-aware-sidebars'),
 				'val'	=> 1,
 				'type'	=> 'select',
 				'list'	=> array(
-					 'Singular',
-					 'Singular & Archive',
-					 'Archive'
+					 __('Singular', 'content-aware-sidebars'),
+					 __('Singular & Archive', 'content-aware-sidebars'),
+					 __('Archive', 'content-aware-sidebars')
 				 )
 			),
 			'handle'	=> array(
-				'name'	=> 'Handle',
+				'name'	=> _x('Handle','option', 'content-aware-sidebars'),
 				'id'	=> 'handle',
-				'desc'	=> 'Replace host sidebar, merge with it or add sidebar manually.',
+				'desc'	=> __('Replace host sidebar, merge with it or add sidebar manually.', 'content-aware-sidebars'),
 				'val'	=> 0,
 				'type'	=> 'select',
 				'list'	=> array(
-					'Replace',
-					'Merge',
-					'Manual'
+					__('Replace', 'content-aware-sidebars'),
+					__('Merge', 'content-aware-sidebars'),
+					__('Manual', 'content-aware-sidebars')
 				)
 			),
 			'host'		=> array(
-				'name'	=> 'Host Sidebar',
+				'name'	=> __('Host Sidebar', 'content-aware-sidebars'),
 				'id'	=> 'host',
-				'desc'	=> 'The sidebar that should be handled with. Nesting is possible. Manual handling makes this option superfluous.',
+				'desc'	=> __('The sidebar that should be handled with. Nesting is possible. Manual handling makes this option superfluous.', 'content-aware-sidebars'),
 				'val'	=> 'sidebar-1',
 				'type'	=> 'select',
 				'list'	=> $sidebar_list
 			),
 			'merge-pos'	=> array(
-				'name'	=> 'Merge position',
+				'name'	=> __('Merge position', 'content-aware-sidebars'),
 				'id'	=> 'merge-pos',
-				'desc'	=> 'Place sidebar on top or bottom of host when merging.',
+				'desc'	=> __('Place sidebar on top or bottom of host when merging.', 'content-aware-sidebars'),
 				'val'	=> 1,
 				'type'	=> 'select',
 				'list'	=> array(
-					'Top',
-					'Bottom'
+					__('Top', 'content-aware-sidebars'),
+					__('Bottom', 'content-aware-sidebars')
 				)
 			)
 		);
@@ -168,23 +168,25 @@ class ContentAwareSidebars {
 	 */
 	public function init_sidebar_type() {
 		
+		load_plugin_textdomain('content-aware-sidebars', false, 'content-aware-sidebars/lang');
+		
 		$this->init_settings();
 		
 		register_post_type('sidebar',array(
 			'labels'	=> array(
-				'name'			=> _x('Sidebars', 'post type general name'),
-				'singular_name'		=> _x('Sidebar', 'post type singular name'),
-				'add_new'		=> _x('Add New', 'sidebar'),
-				'add_new_item'		=> __('Add New Sidebar'),
-				'edit_item'		=> __('Edit Sidebar'),
-				'new_item'		=> __('New Sidebar'),
-				'all_items'		=> __('All Sidebars'),
-				'view_item'		=> __('View Sidebar'),
-				'search_items'		=> __('Search Sidebars'),
-				'not_found'		=>  __('No sidebars found'),
-				'not_found_in_trash'	=> __('No sidebars found in Trash'), 
+				'name'			=> __('Sidebars', 'content-aware-sidebars'),
+				'singular_name'		=> __('Sidebar', 'content-aware-sidebars'),
+				'add_new'		=> _x('Add New', 'sidebar', 'content-aware-sidebars'),
+				'add_new_item'		=> __('Add New Sidebar', 'content-aware-sidebars'),
+				'edit_item'		=> __('Edit Sidebar', 'content-aware-sidebars'),
+				'new_item'		=> __('New Sidebar', 'content-aware-sidebars'),
+				'all_items'		=> __('All Sidebars', 'content-aware-sidebars'),
+				'view_item'		=> __('View Sidebar', 'content-aware-sidebars'),
+				'search_items'		=> __('Search Sidebars', 'content-aware-sidebars'),
+				'not_found'		=> __('No sidebars found', 'content-aware-sidebars'),
+				'not_found_in_trash'	=> __('No sidebars found in Trash', 'content-aware-sidebars'), 
 				'parent_item_colon'	=> '',
-				'menu_name'		=> 'Sidebars'
+				'menu_name'		=> __('Sidebars', 'content-aware-sidebars')
 			),
 			'show_ui'	=> true, 
 			'query_var'	=> false,
@@ -424,7 +426,7 @@ class ContentAwareSidebars {
 	public function create_meta_boxes() {	
 		add_meta_box(
 			'ca-sidebar',
-			'Options',
+			__('Options', 'content-aware-sidebars'),
 			array(&$this,'meta_box_content'),
 			'sidebar',
 			'normal',
@@ -432,7 +434,7 @@ class ContentAwareSidebars {
 		);
 		add_meta_box(
 			'ca-sidebar-author-words',
-			'Words from the author',
+			__('Words from the author', 'content-aware-sidebars'),
 			array(&$this,'meta_box_author_words'),
 			'sidebar',
 			'side',
@@ -460,7 +462,7 @@ class ContentAwareSidebars {
 		wp_nonce_field(basename(__FILE__),'_ca-sidebar-nonce');
 		?>
 		<div style="text-align:center;">
-		<div><p>If you love this plugin, please consider donating.</p></div>
+		<div><p><?php _e('If you love this plugin, please consider donating.', 'content-aware-sidebars'); ?></p></div>
 		<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE6A72LEN4&lc=US&item_name=WordPress%20Plugin%3a%20Content%20Aware%20Sidebars&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted"
 		   target="_blank" title="PayPal - The safer, easier way to pay online!">
 			<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" width="147" height="47" alt="PayPal - The safer, easier way to pay online!">	
@@ -517,7 +519,7 @@ class ContentAwareSidebars {
 					break;
 				case 'text' :
 				default :
-					echo '<input style="width:200px;" type="text" name="'.$setting['id'].'" value="'.implode(",",unserialize($current)).'" />'."\n";
+					echo '<input style="width:200px;" type="text" name="'.$setting['id'].'" value="'.$current.'" />'."\n";
 					break;
 			endswitch; ?>
 				<br /><span class="description"><?php echo $setting['desc'] ?></span>

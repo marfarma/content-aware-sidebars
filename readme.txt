@@ -26,7 +26,7 @@ No extra database tables or table columns will be added.
 
 = Translations =
 
-Content Aware Sidebars can now be translated. If you want to help, please send your translation to jv[at]intox.dk!
+Content Aware Sidebars can now be translated. If you want to help, please contact jv[at]intox.dk.
 
 = Contact =
 

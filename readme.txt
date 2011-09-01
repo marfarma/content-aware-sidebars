@@ -1,4 +1,4 @@
-﻿=== Plugin Name ===
+=== Plugin Name ===
 Contributors: intoxstudio
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE6A72LEN4&lc=US&item_name=WordPress%20Plugin%3a%20Content%20Aware%20Sidebars&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted
 Tags: sidebar, widget, content aware, post type, taxonomy, term, archive
@@ -23,6 +23,10 @@ No extra database tables or table columns will be added.
 * Create complex content with nested sidebars
 * Private sidebars only for members
 * Schedule sidebars for later publishing
+
+= Translations =
+
+Content Aware Sidebars can now be translated. If you want to help, please send your translation to jv[at]intox.dk!
 
 = Contact =
 
@@ -97,7 +101,3 @@ You are.
 = 0.1 =
 
 * Hello World
-
-== Translations ==
-
-None yet. Might come in the future. Do you want to contribute? Send a mail to jv[at]intox.dk

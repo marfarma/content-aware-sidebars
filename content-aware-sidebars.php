@@ -9,6 +9,8 @@ Description: Manage and show sidebars according to the content being viewed.
 Version: 0.5
 Author: Joachim Jensen
 Author URI: http://www.intox.dk/
+Text Domain: content-aware-sidebars
+Domain Path: /lang/
 License: GPL2
 
     Copyright 2011  Joachim Jensen  (email : jv@intox.dk)
@@ -168,7 +170,7 @@ class ContentAwareSidebars {
 	 */
 	public function init_sidebar_type() {
 		
-		load_plugin_textdomain('content-aware-sidebars', false, 'content-aware-sidebars/lang');
+		load_plugin_textdomain('content-aware-sidebars', false, dirname( plugin_basename(__FILE__)).'/lang/');
 		
 		$this->init_settings();
 		

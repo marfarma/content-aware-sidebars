@@ -4,7 +4,7 @@ Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE
 Tags: sidebar, widget, content aware, post type, taxonomy, term, archive
 Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 0.6
+Stable tag: 0.6.1
 
 Manage and show sidebars according to the content being viewed.
 
@@ -58,6 +58,10 @@ You are.
 5. Viewing a page. The content aware sidebar has replaced `Main Sidebar`
 
 == Changelog ==
+
+= 0.6.1 =
+
+* Fixed: an image caused headers already sent error
 
 = 0.6 =
 

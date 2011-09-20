@@ -4,7 +4,7 @@ Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE
 Tags: sidebar, widget, content aware, post type, taxonomy, term, archive
 Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 0.5
+Stable tag: 0.6
 
 Manage and show sidebars according to the content being viewed.
 
@@ -15,10 +15,12 @@ No extra database tables or table columns will be added.
 
 = Features =
 
-* Show sidebars with specific post types
-* Show sidebars with posts containing specific taxonomies or taxonomy terms
-* Show sidebars with specific post type archives, taxonomy archives or taxonomy term archives
-* Show sidebars with search, 404 page and front page
+* Show sidebars with:
+* * Specific singulars
+* * Specific post types
+* * Singulars containing specific taxonomies or taxonomy terms
+* * Specific post type archives, taxonomy archives or taxonomy term archives
+* * Search results, 404 page and front page
 * Merge new sidebars with others, replace them or simply add them to your theme manually
 * Create complex content with nested sidebars
 * Private sidebars only for members
@@ -49,12 +51,19 @@ You are.
 
 == Screenshots ==
 
-1. Add a new sidebar `For Pages` visible on all pages, replacing `Main Sidebar`
-2. Add widgets to `For Pages`
-3. Viewing home page. `Main Sidebar` is visible
-4. Viewing a page. `For Pages` has replaced `Main Sidebar`
+1. Add a new content aware sidebar visible with all pages, search result and a specific category. It replaces `Main Sidebar`
+2. Simple overview of current content aware sidebars
+3. Add widgets to our new sidebar
+4. Viewing a static front page. `Main Sidebar` is visible
+5. Viewing a page. The content aware sidebar has replaced `Main Sidebar`
 
 == Changelog ==
+
+= 0.6 =
+
+* Added: sidebars can be set with specific singulars
+* Added: sidebars can be set with specific post formats
+* Added: updated gui
 
 = 0.5 =
 

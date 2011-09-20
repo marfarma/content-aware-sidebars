@@ -6,7 +6,7 @@
 Plugin Name: Content Aware Sidebars
 Plugin URI: http://www.intox.dk/
 Description: Manage and show sidebars according to the content being viewed.
-Version: 0.5
+Version: 0.6
 Author: Joachim Jensen
 Author URI: http://www.intox.dk/
 Text Domain: content-aware-sidebars
@@ -31,10 +31,11 @@ License: GPL2
 */
 class ContentAwareSidebars {
 	
-	protected $version = 0.5;
-	protected $settings = array();
-	protected $post_types = array();
-	protected $taxonomies = array();	
+	protected $settings		= array();
+	protected $post_types		= array();
+	protected $post_type_objects	= array();
+	protected $taxonomies		= array();
+	protected $taxonomy_objects	= array();
 	
 	/**
 	 *
@@ -43,32 +44,46 @@ class ContentAwareSidebars {
 	 */
 	public function __construct() {
 		
-		add_filter('wp',			array(&$this,'replace_sidebar'));
-		add_action('init',			array(&$this,'init_sidebar_type'),20);
-		add_action('widgets_init',		array(&$this,'create_sidebars'));
-		add_action('admin_init',		array(&$this,'create_meta_boxes'));
-		add_action('admin_head',		array(&$this,'init_metadata'));
-		add_action('admin_menu',		array(&$this,'clear_admin_menu'));
-		add_action('save_post', 		array(&$this,'save_post'));
+		$this->load_dependencies();
 		
-		register_activation_hook(__FILE__,	array(&$this,'upon_activation'));
+		add_filter('wp',					array(&$this,'replace_sidebar'));
+		add_filter('request',					array(&$this,'admin_column_orderby'));
+		add_filter('default_hidden_meta_boxes',			array(&$this,'change_default_hidden'),10,2);	
+		add_filter('manage_edit-sidebar_columns',		array(&$this,'admin_column_headers'));
+		add_filter('manage_edit-sidebar_sortable_columns',	array(&$this,'admin_column_headers'));
+		add_filter('manage_posts_custom_column',		array(&$this,'admin_column_rows'),10,3);
+		add_filter('post_row_actions',				array(&$this,'sidebar_row_actions'),10,2);
+		add_filter('post_updated_messages', 			array(&$this,'sidebar_updated_messages'));
+		
+		add_action('init',					array(&$this,'init_sidebar_type'),50);
+		add_action('widgets_init',				array(&$this,'create_sidebars'));
+		add_action('admin_init',				array(&$this,'create_meta_boxes'));
+		add_action('admin_head',				array(&$this,'init_metadata'));
+		add_action('admin_menu',				array(&$this,'clear_admin_menu'));
+		add_action('save_post', 				array(&$this,'save_post'));
+		
+		register_activation_hook(__FILE__,			array(&$this,'upon_activation'));
 		
 	}
+
 	
 	/**
 	 *
 	 * Initiate lists
 	 *
 	 */
-	private function init_settings() {
-			
+	private function init_settings() {		
 		// Public post types
-		foreach(get_post_types(array('public'=>true),'objects') as $post_type)
+		foreach(get_post_types(array('public'=>true),'objects') as $post_type) {
 			$this->post_types[$post_type->name] = $post_type->label;
+			$this->post_type_objects[$post_type->name] = $post_type;
+		}
 		
 		// Public taxonomies
-		foreach(get_taxonomies(array('public'=>true),'objects') as $tax)
+		foreach(get_taxonomies(array('public'=>true),'objects') as $tax) {
 			$this->taxonomies[$tax->name] = $tax->label;
+			$this->taxonomy_objects[$tax->name] = $tax;
+		}
 	}
 	
 	/**
@@ -79,6 +94,16 @@ class ContentAwareSidebars {
 	 */
 	public function init_metadata() {
 		global $post, $wp_registered_sidebars;
+
+	?>
+	<style>
+	<?php if (isset($post) && $post->post_type == 'sidebar') : ?>
+	#icon-edit {
+		background:transparent url('<?php echo WP_PLUGIN_URL.'/'.plugin_basename(dirname(__FILE__)); ?>/icon-32.png') no-repeat;
+	}
+	<?php endif; ?> 		
+        </style>
+        <?php
 
 		// List of sidebars
 		$sidebar_list = array();
@@ -113,8 +138,8 @@ class ContentAwareSidebars {
 				'type'	=> 'checkbox',
 				'list'	=> array(
 					'front-page'	=> __('Front Page', 'content-aware-sidebars'),
-					'search'	=> __('Search', 'content-aware-sidebars'),
-					'404'		=> __('404', 'content-aware-sidebars')
+					'search'	=> __('Search Results', 'content-aware-sidebars'),
+					'404'		=> __('404 Page', 'content-aware-sidebars')
 				)
 			),
 			'exposure'	=> array(
@@ -144,7 +169,7 @@ class ContentAwareSidebars {
 			'host'		=> array(
 				'name'	=> __('Host Sidebar', 'content-aware-sidebars'),
 				'id'	=> 'host',
-				'desc'	=> __('The sidebar that should be handled with. Nesting is possible. Manual handling makes this option superfluous.', 'content-aware-sidebars'),
+				'desc'	=> __('The sidebar that should be handled. Nesting is possible. Manual handling makes this option superfluous.', 'content-aware-sidebars'),
 				'val'	=> 'sidebar-1',
 				'type'	=> 'select',
 				'list'	=> $sidebar_list
@@ -186,27 +211,54 @@ class ContentAwareSidebars {
 				'view_item'		=> __('View Sidebar', 'content-aware-sidebars'),
 				'search_items'		=> __('Search Sidebars', 'content-aware-sidebars'),
 				'not_found'		=> __('No sidebars found', 'content-aware-sidebars'),
-				'not_found_in_trash'	=> __('No sidebars found in Trash', 'content-aware-sidebars'), 
-				'parent_item_colon'	=> '',
-				'menu_name'		=> __('Sidebars', 'content-aware-sidebars')
+				'not_found_in_trash'	=> __('No sidebars found in Trash', 'content-aware-sidebars')
 			),
 			'show_ui'	=> true, 
 			'query_var'	=> false,
 			'rewrite'	=> false,
 			'menu_position' => null,
 			'supports'	=> array('title','excerpt','page-attributes'),
-			'taxonomies'	=> array_flip($this->taxonomies)
+			'taxonomies'	=> array_flip($this->taxonomies),
+			'menu_icon'	=> WP_PLUGIN_URL.'/'.plugin_basename(dirname(__FILE__)).'/icon-16.png'
 		));		
+	}
+	
+	/**
+	 *
+	 * Create update messages
+	 *
+	 */
+	function sidebar_updated_messages( $messages ) {
+		global $post;
+		$messages['sidebar'] = array(
+			0 => '',
+			1 => sprintf(__('Sidebar updated. <a href="%s">Manage widgets</a>','content-aware-sidebars'),'widgets.php'),
+			2 => '',
+			3 => '',
+			4 => __('Sidebar updated.','content-aware-sidebars'),
+			5 => '',
+			6 => sprintf(__('Sidebar published. <a href="%s">Manage widgets</a>','content-aware-sidebars'), 'widgets.php'),
+			7 => __('Sidebar saved.','content-aware-sidebars'),
+			8 => sprintf(__('Sidebar submitted. <a href="%s">Manage widgets</a>','content-aware-sidebars'),'widgets.php'),
+			9 => sprintf(__('Sidebar scheduled for: <strong>%1$s</strong>. <a href="%2$s">Manage widgets</a>','content-aware-sidebars'),
+			// translators: Publish box date format, see http://php.net/date
+			date_i18n(__('M j, Y @ G:i'),strtotime($post->post_date)),'widgets.php'),
+			10 => sprintf(__('Sidebar draft updated. <a href="%s">Manage widgets</a>','content-aware-sidebars'),'widgets.php'),
+		);
+		return $messages;
 	}
 
 	/**
 	 *
-	 * Remove taxonomy shortcuts from menu. Gets too cluttered.
+	 * Remove taxonomy shortcuts from menu and standard meta boxes.
 	 *
 	 */
 	function clear_admin_menu() {
-		foreach($this->taxonomies as $key => $value)
+		foreach($this->taxonomies as $key => $value) {
 			remove_submenu_page('edit.php?post_type=sidebar','edit-tags.php?taxonomy='.$key.'&amp;post_type=sidebar');
+			remove_meta_box('tagsdiv-'.$key, 'sidebar', 'side');
+			remove_meta_box($key.'div', 'sidebar', 'side');
+		}
 	}
 	
 	/**
@@ -230,6 +282,86 @@ class ContentAwareSidebars {
 				'before_title'	=> '<h3 class="widget-title">',
 				'after_title'	=> '</h3>',
 			));
+	}
+	
+	/**
+	 *
+	 * Add (sortable) admin column headers
+	 *
+	 */
+	public function admin_column_headers($columns) {
+		unset($columns['categories'],$columns['tags']);
+		return array_merge(
+			array_slice($columns, 0, 2, true),
+			array(
+				'exposure'	=> __('Exposure', 'content-aware-sidebars'),
+				'handle'	=> _x('Handle','option', 'content-aware-sidebars'),
+				'merge-pos'	=> __('Merge position', 'content-aware-sidebars')
+			),
+			$columns
+		);
+	}
+	
+	/**
+	 * Manage custom column sorting
+	 */
+	public function admin_column_orderby($vars) {
+		if (isset($vars['orderby']) && in_array($vars['orderby'],array('exposure','handle','merge-pos'))) {
+			$vars = array_merge( $vars, array(
+				'meta_key'	=> $vars['orderby'],
+				'orderby'	=> 'meta_value'
+			) );
+		}
+		return $vars;
+	}
+	
+	/**
+	 *
+	 * Add admin column rows
+	 *
+	 */
+	public function admin_column_rows($column_name,$post_id) {
+		
+		// Fix for quick edit
+		if(!$this->settings) $this->init_metadata();
+		
+		$current = get_post_meta($post_id,$column_name,true);
+		$current_from_list = $this->settings[$column_name]['list'][$current];
+		
+		switch($column_name) {
+			case 'handle':		
+				$host = $this->settings['host']['list'][get_post_meta($post_id,'host',true)];		
+				if($current == 0) {
+					printf(__("Replace %s",'content-aware-sidebars'),$host);
+				} elseif($current == 1) {
+					printf(__("Merge with %s",'content-aware-sidebars'),$host);
+				} else {
+					echo $current_from_list;
+				}	
+				break;
+			case 'exposure':
+			case 'merge-pos':
+				echo $current_from_list;
+				break;
+		}
+	}
+	
+	/**
+	 *
+	 * Add admin rows actions
+	 *
+	 */
+	public function sidebar_row_actions($actions, $post) {
+		if($post->post_type == 'sidebar') {
+			return array_merge(
+				array_slice($actions, 0, 2, true),
+				array(
+				      'mng_widgets' => 	'<a href="widgets.php" title="'.esc_html(__( 'Manage Widgets','content-aware-sidebars')).'">'.__( 'Manage Widgets','content-aware-sidebars').'</a>'
+				),
+				$actions
+			);
+		}
+		return $actions;
 	}
 
 	/**
@@ -294,7 +426,8 @@ class ContentAwareSidebars {
 		} elseif(is_singular()) {
 			
 			$joins .= "LEFT JOIN $wpdb->postmeta post_types ON post_types.post_id = posts.ID AND post_types.meta_key = 'post_types' ";
-			$where .= "(post_types.meta_value LIKE '%".serialize(get_post_type())."%'";		
+			$where .= "(post_types.meta_value LIKE '%".serialize(get_post_type())."%'";			
+			$where .= " OR post_types.meta_value LIKE '%".serialize((string)get_the_ID())."%'";
 			
 			$post_taxonomies = get_object_taxonomies(get_post_type());
 			
@@ -422,18 +555,11 @@ class ContentAwareSidebars {
 	
 	/**
 	 *
-	 * Meta boxes for edit post
+	 * Meta boxes for sidebar edit
 	 *
 	 */
-	public function create_meta_boxes() {	
-		add_meta_box(
-			'ca-sidebar',
-			__('Options', 'content-aware-sidebars'),
-			array(&$this,'meta_box_content'),
-			'sidebar',
-			'normal',
-			'high'
-		);
+	public function create_meta_boxes() {
+		// Author Words
 		add_meta_box(
 			'ca-sidebar-author-words',
 			__('Words from the author', 'content-aware-sidebars'),
@@ -442,7 +568,39 @@ class ContentAwareSidebars {
 			'side',
 			'high'
 		);
-		
+		// Post Types
+		foreach($this->post_type_objects as $post_type) {
+			add_meta_box(
+				'ca-sidebar-post-type-'.$post_type->name,
+				$post_type->label,
+				array(&$this,'meta_box_post_type'),
+				'sidebar',
+				'normal',
+				'high',
+				$post_type
+			);
+		}
+		// Taxonomies
+		foreach($this->taxonomy_objects as $tax) {
+			add_meta_box(
+				'ca-sidebar-tax-'.$tax->name,
+				$tax->label,
+				array(&$this,'meta_box_taxonomy'),
+				'sidebar',
+				'side',
+				'default',
+				$tax
+			);
+		}
+		// Options
+		add_meta_box(
+			'ca-sidebar',
+			__('Options', 'content-aware-sidebars'),
+			array(&$this,'meta_box_content'),
+			'sidebar',
+			'normal',
+			'high'
+		);
 	}
 	
 	/**
@@ -473,6 +631,112 @@ class ContentAwareSidebars {
 		<?php
 	}
 	
+	public function meta_box_taxonomy($post, $tax) {
+		$meta = get_post_meta($post->ID, 'taxonomies', true);
+		$current = $meta != '' ? $meta : array();
+		
+		$taxonomy = $tax['args']->name;
+		
+		$terms = get_terms( $taxonomy);
+
+		if ( ! $terms || is_wp_error($terms) ) {
+			echo '<p>' . __( 'No items.' ) . '</p>';
+			
+		} else {
+		
+			?>
+	<div id="taxonomy-<?php echo $taxonomy; ?>" class="categorydiv">
+		<ul id="<?php echo $taxonomy; ?>-tabs" class="category-tabs">
+			<li class="hide-if-no-js"><a href="#<?php echo $taxonomy; ?>-pop" tabindex="3"><?php _e( 'Most Used' ); ?></a></li>
+			<li class="tabs"><a href="#<?php echo $taxonomy; ?>-all" tabindex="3"><?php _e('View All');; ?></a></li>
+		</ul>
+
+		<div id="<?php echo $taxonomy; ?>-pop" class="tabs-panel" style="display: none;height:inherit;max-height:200px;">
+			<ul id="<?php echo $taxonomy; ?>checklist-pop" class="categorychecklist form-no-clear" >
+				<?php $popular_ids = cas_popular_terms_checklist($tax['args']); ?>
+			</ul>
+		</div>
+		
+		<div id="<?php echo $taxonomy; ?>-all" class="tabs-panel" style="height:inherit;max-height:200px;">
+			<?php
+            $name = ( $taxonomy == 'category' ) ? 'post_category[]' : 'tax_input[' . $taxonomy . ']';
+            echo "<input type='hidden' name='{$name}' value='0' />"; // Allows for an empty term set to be sent. 0 is an invalid Term ID and will be ignored by empty() checks.
+            ?>
+			<ul id="<?php echo $taxonomy; ?>checklist" class="list:<?php echo $taxonomy?> categorychecklist form-no-clear">
+				<?php cas_terms_checklist($post->ID, array( 'taxonomy' => $taxonomy, 'popular_cats' => $popular_ids ) ) ?>
+			</ul>
+		</div>
+	</div>
+	<?php
+		}
+	
+		echo '<p style="padding:6px 0 4px;">'."\n";
+		echo '<label><input type="checkbox" name="taxonomies[]" value="'.$tax['args']->name.'"'.(in_array($tax['args']->name,$current) ? ' checked="checked"' : '').' /> '.sprintf(__('Show with %s'),$tax['args']->labels->all_items).'</label>'."\n";
+		echo '</p>'."\n";
+	
+	}
+	
+	public function meta_box_post_type($post, $box) {
+		$meta = get_post_meta($post->ID, 'post_types', true);
+		$current = $meta != '' ? $meta : array();
+		$post_type = $box['args'];
+		
+		$exclude = array();
+		if($post_type->name == 'page' && 'page' == get_option( 'show_on_front')) {
+			$exclude[] = get_option('page_on_front');
+			$exclude[] = get_option('page_for_posts');
+		}
+		
+		$posts = get_posts(array('post_type'=>$post_type->name,'exclude'=>$exclude));
+		
+		if ( ! $posts || is_wp_error($posts) ) {
+			echo '<p>' . __( 'No items.' ) . '</p>';
+			
+		} else {
+		
+		?>
+		
+		<div id="posttype-<?php echo $post_type->name; ?>" class="categorydiv">
+		<ul id="posttype-<?php echo $post_type->name; ?>-tabs" class="category-tabs">
+			<li class="tabs"><a href="#<?php echo $post_type->name; ?>-all" tabindex="3"><?php _e('View All');; ?></a></li>
+		</ul>
+		
+		<div id="<?php echo $post_type->name; ?>-all" class="tabs-panel" style="height:inherit;max-height:200px;">
+			<ul id="<?php echo $post_type->name; ?>checklist" class="list:<?php echo $post_type->name?> categorychecklist form-no-clear">
+				<?php cas_posts_checklist($post->ID, array( 'post_type' => $post_type->name) ) ?>
+			</ul>
+		</div>
+		</div>
+		
+		<?php
+		
+		}
+		
+		echo '<p style="padding:6px 0 4px;">'."\n";
+		echo '<label><input type="checkbox" name="post_types[]" value="'.$post_type->name.'"'.(in_array($post_type->name,$current) ? ' checked="checked"' : '').' /> '.sprintf(__('Show with %s'),$post_type->labels->all_items).'</label>'."\n";
+		echo '</p>'."\n";
+
+	}
+	
+	/**
+	 *
+	 * Hide some meta boxes from start
+	 *
+	 */
+	function change_default_hidden( $hidden, $screen ) {
+	        
+	    if ($screen->base == 'sidebar' && get_user_option( 'metaboxhidden_sidebar' ) === false) {
+		
+		$hidden_meta_boxes = array('pageparentdiv','ca-sidebar-tax-post_format','ca-sidebar-post-type-attachment');
+		$hidden = array_merge($hidden,$hidden_meta_boxes);
+		
+		$user = wp_get_current_user();
+		update_user_option( $user->ID, 'metaboxhidden_sidebar', $hidden, true );
+		
+	    }
+	    return $hidden;
+	}
+	
 	/**
 	 *
 	 * Create form fields
@@ -484,10 +748,14 @@ class ContentAwareSidebars {
 		?>
 		<table class="form-table"> 
 		<?php
-		if(!empty($array))
+		if(!empty($array)) {
 			$array = array_intersect_key($this->settings,array_flip($array));
-		else
+		} else {
 			$array = $this->settings;
+			unset($array['taxonomies']);
+			unset($array['post_types']);
+		}
+				
 		foreach($array as $setting) :
 		
 			$meta = get_post_meta($post->ID, $setting['id'], true);
@@ -539,37 +807,37 @@ class ContentAwareSidebars {
 	 */
 	public function save_post($post_id) {
 		
+		// Save button pressed
+		if(!isset($_POST['original_publish']) && !isset($_POST['save_post']))
+			return;
+		
 		// Only sidebar type
 		if(get_post_type($post_id) != 'sidebar')
-			return $post_id;
-		
-		// Save button pressed
-		if(!isset($_POST['original_publish']))
-			return $post_id;
+			return;	
 		
 		// Verify nonce
 		if (!check_admin_referer(basename(__FILE__),'_ca-sidebar-nonce'))
-			return $post_id;
+			return;
 		
 		// Check permissions
 		if (!current_user_can('edit_post', $post_id))
-			return $post_id;
+			return;
 		
 		// Check autosave
 		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)
-			return $post_id;
+			return;
 		
-		// Load settings manually here. This ought to be done with action/filter
+		// Load metadata
 		$this->init_metadata();
 		
-		// Update values
+		// Update metadata
 		foreach ($this->settings as $field) {
 			$old = get_post_meta($post_id, $field['id'], true);			
 			$new = isset($_POST[$field['id']]) ? $_POST[$field['id']] : '';
 
 			if ($new != '' && $new != $old) {
 				update_post_meta($post_id, $field['id'], $new);		
-			}elseif ($new == '' && $old != '') {
+			} elseif ($new == '' && $old != '') {
 				delete_post_meta($post_id, $field['id'], $old);	
 			}
 		}
@@ -583,6 +851,12 @@ class ContentAwareSidebars {
 	public function upon_activation() {
 		$this->init_sidebar_type();
 		flush_rewrite_rules();
+	}
+	
+	public function load_dependencies() {
+		
+		require_once('walker.php');
+		
 	}
 	
 }

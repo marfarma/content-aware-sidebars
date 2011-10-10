@@ -36,8 +36,6 @@ www.intox.dk
 
 == Installation ==
 
-Easy install:
-
 1. Upload the full plugin directory to your `/wp-content/plugins/` directory or install the plugin through `Plugins` in the administration 
 1. Activate the plugin through `Plugins` in the administration
 1. Have fun creating your first sidebar

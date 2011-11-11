@@ -47,6 +47,7 @@ www.intox.dk
 = Who's great? =
 
 You are.
+Use the support forum or send an email to jv[at]intox.dk for questions or feedback. FAQ will get here eventually.
 
 == Screenshots ==
 
@@ -127,5 +128,3 @@ You are.
 = 0.1 =
 
 * Hello World
-
-

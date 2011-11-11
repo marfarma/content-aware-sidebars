@@ -6,7 +6,7 @@
 Plugin Name: Content Aware Sidebars
 Plugin URI: http://www.intox.dk/
 Description: Manage and show sidebars according to the content being viewed.
-Version: 0.6.1
+Version: 0.6.3
 Author: Joachim Jensen
 Author URI: http://www.intox.dk/
 Text Domain: content-aware-sidebars
@@ -36,6 +36,7 @@ class ContentAwareSidebars {
 	protected $post_type_objects	= array();
 	protected $taxonomies		= array();
 	protected $taxonomy_objects	= array();
+	protected $sidebar_cache	= array();
 	
 	/**
 	 *
@@ -208,7 +209,7 @@ class ContentAwareSidebars {
 			'rewrite'	=> false,
 			'menu_position' => null,
 			'supports'	=> array('title','excerpt','page-attributes'),
-			'taxonomies'	=> array_flip($this->taxonomies),
+			'taxonomies'	=> array_keys($this->taxonomies),
 			'menu_icon'	=> WP_PLUGIN_URL.'/'.plugin_basename(dirname(__FILE__)).'/icon-16.png'
 		));		
 	}
@@ -253,12 +254,12 @@ class ContentAwareSidebars {
 	
 	/**
 	 *
-	 * Create sidebars from content types
+	 * Add sidebars to widgets area
 	 *
 	 */
 	public function create_sidebars() {
 		$posts = get_posts(array(
-			'numberposts'	=> 0,
+			'numberposts'	=> -1,
 			'post_type'	=> 'sidebar',
 			'post_status'	=> array('publish','private','future')
 		));
@@ -293,7 +294,9 @@ class ContentAwareSidebars {
 	}
 	
 	/**
+	 *
 	 * Manage custom column sorting
+	 * 
 	 */
 	public function admin_column_orderby($vars) {
 		if (isset($vars['orderby']) && in_array($vars['orderby'],array('exposure','handle','merge-pos'))) {
@@ -368,11 +371,11 @@ class ContentAwareSidebars {
 			return;
 		
 		foreach($posts as $post) {
-	
+			
 			$id = 'ca-sidebar-'.$post->ID;
 			
-			// Check if sidebar exists
-			if (!isset($_wp_sidebars_widgets[$id]))
+			// Check for correct handling and if sidebar exists
+			if ($post->handle == 2 || !isset($_wp_sidebars_widgets[$id]))
 				continue;
 			
 			// If host has already been replaced, merge with it instead. Might change in future.
@@ -394,8 +397,16 @@ class ContentAwareSidebars {
 	 * @return array|bool
 	 *
 	 */
-	public function get_sidebars($handle = "!= '2'") {
+	public function get_sidebars() {
 		global $wpdb, $post_type;
+		
+		// Return cache if present
+		if(!empty($this->sidebar_cache)) {
+			if($this->sidebar_cache[0] == false)
+				return false;
+			else
+				return $this->sidebar_cache;
+		}
 		
 		$errors = 1;
 		
@@ -503,18 +514,19 @@ class ContentAwareSidebars {
 		}
 		
 		// Check if any errors are left
-		if($errors)
+		if($errors) {
 			return false;
+		}
 		
 		// Show private sidebars or not
 		if(current_user_can('read_private_posts'))
 			$post_status = "IN('publish','private')";
 		else
 			$post_status = "= 'publish'";		
-		$where .= "posts.post_status ".$post_status." AND ";
+		$where .= "posts.post_status ".$post_status."";
 		
-		// Return proper sidebars
-		return $wpdb->get_results("
+		// Do query and cache it
+		$this->sidebar_cache = $wpdb->get_results("
 			SELECT
 				posts.ID,
 				handle.meta_value handle,
@@ -537,10 +549,13 @@ class ContentAwareSidebars {
 			WHERE
 				posts.post_type = 'sidebar' AND
 				$where
-				handle.meta_value $handle
 			GROUP BY posts.ID
 			ORDER BY posts.menu_order ASC, handle.meta_value DESC, posts.post_date DESC
 		");
+		
+		// Return proper cache. If query was empty, tell the cache.
+		return empty($this->sidebar_cache) ? $this->sidebar_cache[0] = false : $this->sidebar_cache;
+		
 	}
 	
 	/**
@@ -621,47 +636,46 @@ class ContentAwareSidebars {
 		<?php
 	}
 	
-	public function meta_box_taxonomy($post, $tax) {
+	public function meta_box_taxonomy($post, $box) {
 		$meta = get_post_meta($post->ID, 'taxonomies', true);
 		$current = $meta != '' ? $meta : array();
 		
-		$taxonomy = $tax['args']->name;
+		$taxonomy = $box['args'];
 		
-		$terms = get_terms( $taxonomy);
+		$terms = get_terms($taxonomy->name, array('get' => 'all'));
 
-		if ( ! $terms || is_wp_error($terms) ) {
-			echo '<p>' . __( 'No items.' ) . '</p>';
-			
+		if (!$terms || is_wp_error($terms)) {
+			echo '<p>'.__('No items.').'</p>';	
 		} else {
 		
-			?>
-	<div id="taxonomy-<?php echo $taxonomy; ?>" class="categorydiv">
-		<ul id="<?php echo $taxonomy; ?>-tabs" class="category-tabs">
-			<li class="hide-if-no-js"><a href="#<?php echo $taxonomy; ?>-pop" tabindex="3"><?php _e( 'Most Used' ); ?></a></li>
-			<li class="tabs"><a href="#<?php echo $taxonomy; ?>-all" tabindex="3"><?php _e('View All');; ?></a></li>
+?>
+	<div id="taxonomy-<?php echo $taxonomy->name; ?>" class="categorydiv">
+		<ul id="<?php echo $taxonomy->name; ?>-tabs" class="category-tabs">
+			<li class="hide-if-no-js"><a href="#<?php echo $taxonomy->name; ?>-pop" tabindex="3"><?php _e( 'Most Used' ); ?></a></li>
+			<li class="tabs"><a href="#<?php echo $taxonomy->name; ?>-all" tabindex="3"><?php _e('View All');; ?></a></li>
 		</ul>
 
-		<div id="<?php echo $taxonomy; ?>-pop" class="tabs-panel" style="display: none;height:inherit;max-height:200px;">
-			<ul id="<?php echo $taxonomy; ?>checklist-pop" class="categorychecklist form-no-clear" >
-				<?php $popular_ids = cas_popular_terms_checklist($tax['args']); ?>
+		<div id="<?php echo $taxonomy->name; ?>-pop" class="tabs-panel" style="display: none;height:inherit;max-height:200px;">
+			<ul id="<?php echo $taxonomy->name; ?>checklist-pop" class="categorychecklist form-no-clear" >
+				<?php $popular_ids = cas_popular_terms_checklist($taxonomy); ?>
 			</ul>
 		</div>
 		
-		<div id="<?php echo $taxonomy; ?>-all" class="tabs-panel" style="height:inherit;max-height:200px;">
+		<div id="<?php echo $taxonomy->name; ?>-all" class="tabs-panel" style="height:inherit;max-height:200px;">
 			<?php
-            $name = ( $taxonomy == 'category' ) ? 'post_category[]' : 'tax_input[' . $taxonomy . ']';
+            $name = ( $taxonomy->name == 'category' ) ? 'post_category[]' : 'tax_input[' . $taxonomy->name . ']';
             echo "<input type='hidden' name='{$name}' value='0' />"; // Allows for an empty term set to be sent. 0 is an invalid Term ID and will be ignored by empty() checks.
             ?>
-			<ul id="<?php echo $taxonomy; ?>checklist" class="list:<?php echo $taxonomy?> categorychecklist form-no-clear">
-				<?php cas_terms_checklist($post->ID, array( 'taxonomy' => $taxonomy, 'popular_cats' => $popular_ids ) ) ?>
+			<ul id="<?php echo $taxonomy->name; ?>checklist" class="list:<?php echo $taxonomy->name?> categorychecklist form-no-clear">
+				<?php cas_terms_checklist($post->ID, array('taxonomy' => $taxonomy,'popular_terms' => $popular_ids, 'terms' => $terms)) ?>
 			</ul>
 		</div>
 	</div>
-	<?php
+<?php
 		}
 	
 		echo '<p style="padding:6px 0 4px;">'."\n";
-		echo '<label><input type="checkbox" name="taxonomies[]" value="'.$tax['args']->name.'"'.(in_array($tax['args']->name,$current) ? ' checked="checked"' : '').' /> '.sprintf(__('Show with %s'),$tax['args']->labels->all_items).'</label>'."\n";
+		echo '<label><input type="checkbox" name="taxonomies[]" value="'.$taxonomy->name.'"'.(in_array($taxonomy->name,$current) ? ' checked="checked"' : '').' /> '.sprintf(__('Show with %s'),$taxonomy->labels->all_items).'</label>'."\n";
 		echo '</p>'."\n";
 	
 	}
@@ -677,29 +691,29 @@ class ContentAwareSidebars {
 			$exclude[] = get_option('page_for_posts');
 		}
 		
-		$posts = get_posts(array('post_type'=>$post_type->name,'exclude'=>$exclude));
+		$posts = get_posts(array(
+			'numberposts'	=> -1,
+			'post_type'	=> $post_type->name,
+			'post_status'	=> array('publish','private','future'),
+			'exclude'	=> $exclude
+		));
 		
-		if ( ! $posts || is_wp_error($posts) ) {
-			echo '<p>' . __( 'No items.' ) . '</p>';
-			
+		if (!$posts || is_wp_error($posts)) {
+			echo '<p>'.__('No items.').'</p>';	
 		} else {
 		
-		?>
-		
+?>	
 		<div id="posttype-<?php echo $post_type->name; ?>" class="categorydiv">
 		<ul id="posttype-<?php echo $post_type->name; ?>-tabs" class="category-tabs">
 			<li class="tabs"><a href="#<?php echo $post_type->name; ?>-all" tabindex="3"><?php _e('View All');; ?></a></li>
-		</ul>
-		
+		</ul>		
 		<div id="<?php echo $post_type->name; ?>-all" class="tabs-panel" style="height:inherit;max-height:200px;">
 			<ul id="<?php echo $post_type->name; ?>checklist" class="list:<?php echo $post_type->name?> categorychecklist form-no-clear">
-				<?php cas_posts_checklist($post->ID, array( 'post_type' => $post_type->name) ) ?>
+				<?php cas_posts_checklist($post->ID, array('post_type' => $post_type,'posts'=>$posts)); ?>
 			</ul>
 		</div>
-		</div>
-		
-		<?php
-		
+		</div>	
+<?php	
 		}
 		
 		echo '<p style="padding:6px 0 4px;">'."\n";
@@ -739,7 +753,7 @@ class ContentAwareSidebars {
 		<table class="form-table"> 
 		<?php
 		if(!empty($array)) {
-			$array = array_intersect_key($this->settings,array_flip($array));
+			$array = array_intersect_key($this->settings,array_keys($array));
 		} else {
 			$array = $this->settings;
 			unset($array['taxonomies']);
@@ -843,7 +857,12 @@ class ContentAwareSidebars {
 		flush_rewrite_rules();
 	}
 	
-	public function load_dependencies() {
+	/**
+	 *
+	 * Load dependencies
+	 *
+	 */
+	private function load_dependencies() {
 		
 		require_once('walker.php');
 		
@@ -859,25 +878,35 @@ $ca_sidebars = new ContentAwareSidebars();
 function display_ca_sidebar($args = array()) {
 	global $ca_sidebars, $_wp_sidebars_widgets;
 	
-	// Grab args or defaults	
+	// Grab args or defaults
 	$defaults = array (
+		'include'	=> '',
  		'before'	=> '<div id="sidebar" class="widget-area"><ul class="xoxo">',
 		'after'		=> '</ul></div>'
 	);
 	$args = wp_parse_args($args,$defaults);
 	extract($args,EXTR_SKIP);
-		
-	$posts = $ca_sidebars->get_sidebars("='2'");
+	
+	// Get sidebars
+	$posts = $ca_sidebars->get_sidebars();
 	if(!$posts)
 		return;
 	
+	// Handle include argument
+	if(!empty($include)) {
+		if(!is_array($include))
+			$include = explode(',',$include);
+		// Fast lookup
+		$include = array_flip($include);
+	}
+	
 	$i = $host = 0;	
 	foreach($posts as $post) {
-		
+
 		$id = 'ca-sidebar-'.$post->ID;
 			
-		// Check if sidebar exists
-		if (!isset($_wp_sidebars_widgets[$id]))
+		// Check for manual handling, if sidebar exists and if id should be included
+		if ($post->handle != 2 || !isset($_wp_sidebars_widgets[$id]) || (!empty($include) && !isset($include[$post->ID])))
 			continue;
 		
 		// Merge if more than one. First one is host.

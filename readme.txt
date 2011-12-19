@@ -1,28 +1,30 @@
 ﻿=== Plugin Name ===
 Contributors: intoxstudio
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=KPZHE6A72LEN4&lc=US&item_name=WordPress%20Plugin%3a%20Content%20Aware%20Sidebars&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted
-Tags: sidebar, widget, content aware, post type, taxonomy, term, archive, singular
+Tags: sidebar, widget, content aware, post type, taxonomy, term, archive, singular, seo
 Requires at least: 3.1
-Tested up to: 3.2.1
-Stable tag: 0.6.3
+Tested up to: 3.3
+Stable tag: 0.7
 
 Manage and show sidebars according to the content being viewed.
 
 == Description ==
 
-Manage an infinite number of sidebars. Each with different rules for which content they should be visible with. Creating flexible sidebars has never been easier, and no code is needed at all as everything is done in the administration.
+Manage an infinite number of sidebars. Make your WordPress site even more dynamic and boost SEO by controlling what content the sidebars should be displayed with. Creating flexible, dynamic sidebars has never been easier, and no code is needed at all as everything is easily done in the administration.
 No extra database tables or table columns will be added.
 
 = Features =
 
 * Show sidebars with:
-	* Specific singulars
-	* Specific post types
+	* Specific singulars - e.g. specific posts or pages
+	* Specific (custom) post types
+	* Specific page templates
 	* Singulars containing specific taxonomies or taxonomy terms
-	* Specific post type archives, taxonomy archives or taxonomy term archives
+	* Singulars made by specific authors
+	* Specific post type archives, author archives, taxonomy archives or taxonomy term archives
 	* Search results, 404 page and front page
 	* Any combination of the above
-* Merge new sidebars with others, replace them or simply add them to your theme manually
+* Merge new sidebars with others, replace them or simply add them to your theme manually with a template tag
 * Create complex content with nested sidebars
 * Private sidebars only for members
 * Schedule sidebars for later publishing
@@ -44,20 +46,45 @@ www.intox.dk
 
 == Frequently Asked Questions ==
 
-= Who's great? =
+If you have any questions not answered here, feel free to contact jv[at]intox.dk.
 
-You are.
-Use the support forum or send an email to jv[at]intox.dk for questions or feedback. FAQ will get here eventually.
+= How do I use `display_ca_sidebar()`? =
+
+This function handles all sidebars that are set to be handled manually. It can be inserted anywhere on your site in any quantity, either as it is, or with the following parameters:
+
+`include` (array|string)
+Insert IDs of sidebars. By using this, the function will only handle the sidebars whose IDs are included. Default is `null`.
+
+`before` (string)
+Change the html to be displayed before the sidebar. Default is `<div id="sidebar" class="widget-area"><ul class="xoxo">`.
+
+`after` (string)
+Change the html to be displayed after the sidebar. Default is `</ul></div>`.
+
+The function accepts URL-style strings as parameters too, like the standard WordPress Template Tags.
 
 == Screenshots ==
 
-1. Add a new content aware sidebar visible with all pages, search result and a specific category. It replaces `Main Sidebar`
-2. Simple overview of current content aware sidebars
-3. Add widgets to our new sidebar
-4. Viewing a static front page. `Main Sidebar` is visible
-5. Viewing a page. The content aware sidebar has replaced `Main Sidebar`
+1. Add a new Content Aware Sidebar to be displayed with All Posts and Another Page. It replaces `Main Sidebar`
+2. Simple overview of all created Content Aware Sidebars
+3. Add widgets to the newly added sidebar
+4. Viewing front page of site. `Main Sidebar` is displayed
+5. Viewing Another Page. The Content Aware Sidebar has replaced `Main Sidebar`
 
 == Changelog ==
+
+= 0.7 =
+
+* Added: sidebars will be displayed even if empty (i.e. hidden)
+* Added: author rules on singulars and archives
+* Added: page template rules
+* Added: javascript handling for disabling/enabling specific input on editor page
+* Fixed: minor tweak for full compatibility with wp3.3
+* Fixed: function for meta boxes is called only on editor page
+* Fixed: proper column sorting in administration
+* Fixed: specific post type label not supported in WP3.1.x
+* Fixed: type (array) not supported as post_status in get_posts() in WP3.1.x
+* Fixed: code cleanup
 
 = 0.6.3 =
 
@@ -128,3 +155,4 @@ Use the support forum or send an email to jv[at]intox.dk for questions or feedba
 = 0.1 =
 
 * Hello World
+

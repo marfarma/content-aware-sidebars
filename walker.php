@@ -1,81 +1,65 @@
 <?php
-
 /**
- * TODO: Clean this mess...
+ * @package Content Aware Sidebars
  */
 
 /**
  *
- * Custom Walker Class
+ * Walker for post types and taxonomies
  *
  */
-class CAS_Walker_Tax_Checklist extends Walker {
-	var $tree_type = 'category';
-	var $db_fields = array ('parent' => 'parent', 'id' => 'term_id');
-
+class CAS_Walker_Checklist extends Walker {
+	
+	function __construct($tree_type, $db_fields) {
+		
+		$this->tree_type = $tree_type;
+		$this->db_fields = $db_fields;
+		
+	}
+	
 	public function start_lvl(&$output, $depth, $args) {
 		$indent = str_repeat("\t", $depth);
 		$output .= "$indent<ul class='children'>\n";
 	}
-
+	
 	public function end_lvl(&$output, $depth, $args) {
 		$indent = str_repeat("\t", $depth);
 		$output .= "$indent</ul>\n";
 	}
-
+	
 	public function start_el(&$output, $term, $depth, $args) {
 		extract($args);
 		
-                if ( empty($taxonomy) ) {
-			$output .= "\n<li>";
-                        return;
-		}
-
-                $name = $taxonomy->name == 'category' ? 'post_category' : 'tax_input['.$taxonomy->name.']';                   
-                $value = $taxonomy->hierarchical ? 'term_id' : 'slug';
-		$class = in_array( $term->term_id, $popular_terms ) ? ' class="popular-category"' : '';
+		if(isset($post_type)) {
+			
+			if ( empty($post_type) ) {
+				$output .= "\n<li>";
+				return;
+			}
+			
+			$output .= "\n".'<li id="'.$post_type->name.'-'.$term->ID.'"><label class="selectit"><input value="'.$term->ID.'" type="checkbox" name="post_types[]" id="in-'.$post_type->name.'-'.$term->ID.'"'.checked(in_array($term->ID,$selected_cats),true,false).disabled(empty($disabled),false,false).'/> '.esc_html( $term->post_title ).'</label>';
+			
+		} else {
+			
+			if ( empty($taxonomy) ) {
+				$output .= "\n<li>";
+				return;
+			}
+			
+			$name = $taxonomy->name == 'category' ? 'post_category' : 'tax_input['.$taxonomy->name.']';                   
+			$value = $taxonomy->hierarchical ? 'term_id' : 'slug';
+			$class = in_array( $term->term_id, $popular_terms ) ? ' class="popular-category"' : '';
                 
-		$output .= "\n".'<li id="'.$taxonomy->name.'-'.$term->term_id.'"$class><label class="selectit"><input value="'.$term->$value.'" type="checkbox" name="'.$name.'[]" id="in-'.$taxonomy->name.'-'.$term->term_id.'"'.checked(in_array($term->term_id,$selected_terms),true,false).disabled(empty($disabled),false,false).'/> '.esc_html( apply_filters('the_category', $term->name )) . '</label>';
-	}
-
-	public function end_el(&$output, $term, $depth, $args) {
-		$output .= "</li>\n";
-	}
-}
-
-/**
- *
- * Custom Walker Class
- *
- */
-class CAS_Walker_Post_Checklist extends Walker {
-	var $tree_type = 'post';
-	var $db_fields = array ('parent' => 'post_parent', 'id' => 'ID');
-
-	public function start_lvl(&$output, $depth, $args) {
-		$indent = str_repeat("\t", $depth);
-		$output .= "$indent<ul class='children'>\n";
-	}
-
-	public function end_lvl(&$output, $depth, $args) {
-		$indent = str_repeat("\t", $depth);
-		$output .= "$indent</ul>\n";
-	}
-
-	public function start_el(&$output, $term, $depth, $args) {
-		extract($args);
+			$output .= "\n".'<li id="'.$taxonomy->name.'-'.$term->term_id.'"$class><label class="selectit"><input value="'.$term->$value.'" type="checkbox" name="'.$name.'[]" id="in-'.$taxonomy->name.'-'.$term->term_id.'"'.checked(in_array($term->term_id,$selected_terms),true,false).disabled(empty($disabled),false,false).'/> '.esc_html( apply_filters('the_category', $term->name )) . '</label>';
 		
-                if ( empty($post_type) ) {
-			$output .= "\n<li>";
-                        return;
 		}
 
-		$output .= "\n".'<li id="'.$post_type->name.'-'.$term->ID.'"><label class="selectit"><input value="'.$term->ID.'" type="checkbox" name="post_types[]" id="in-'.$post_type->name.'-'.$term->ID.'"'.checked(in_array($term->ID,$selected_cats),true,false).disabled(empty($disabled),false,false).'/> '.esc_html( $term->post_title ).'</label>';
-	}
+        }
 
 	public function end_el(&$output, $term, $depth, $args) {
 		$output .= "</li>\n";
 	}
+	
 }
 
 /**
@@ -86,15 +70,13 @@ class CAS_Walker_Post_Checklist extends Walker {
 function cas_terms_checklist($post_id = 0, $args = array()) {
  	$defaults = array(
 		'popular_terms' => false,
-		'walker' => null,
 		'taxonomy' => 'category',
 		'terms' => null,
 		'checked_ontop' => true
 	);
 	extract(wp_parse_args($args, $defaults), EXTR_SKIP);
 
-	if (empty($walker) || !is_a($walker, 'Walker'))
-		$walker = new CAS_Walker_Tax_Checklist();
+	$walker = new CAS_Walker_Checklist('category',array ('parent' => 'parent', 'id' => 'term_id'));
 
 	if(!is_object($taxonomy))
 		$taxonomy = get_taxonomy($taxonomy);
@@ -179,15 +161,13 @@ function cas_popular_terms_checklist( $taxonomy, $default = 0, $number = 10, $ec
  */
 function cas_posts_checklist($post_id = 0, $args = array()) {
  	$defaults = array(
-		'walker' => null,
 		'post_type' => 'post',
 		'posts' => null,
 		'checked_ontop' => true
 	);
 	extract(wp_parse_args($args, $defaults), EXTR_SKIP);
 
-	if (empty($walker) || !is_a($walker, 'Walker'))
-		$walker = new CAS_Walker_Post_Checklist();
+	$walker = new CAS_Walker_Checklist('post',array ('parent' => 'post_parent', 'id' => 'ID'));
 
 	if(!is_object($post_type))
 		$post_type = get_post_type_object($post_type);
